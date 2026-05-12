@@ -1,0 +1,34 @@
+% match 1 full box
+#main-content > div.lineups > div:nth-child(1) 
+
+% match 2 full box
+#main-content > div.lineups > div:nth-child(2) 
+
+% date for match 1
+#main-content > div.lineups > div:nth-child(1) > div.lineup__meta.flex-row > div.lineup__time 
+#main-content > div.lineups > div:nth-child(1) > div.lineup__meta.flex-row > div.lineup__time > b
+
+% match 1 home team name
+#main-content > div.lineups > div:nth-child(1) > div.lineup__box > div.lineup__top > div > div.lineup__team.is-home
+
+% match 1 away team name
+#main-content > div.lineups > div:nth-child(1) > div.lineup__box > div.lineup__matchup > div.lineup__mteam.is-visit
+
+% match 1 lineup box
+#main-content > div.lineups > div:nth-child(1) > div.lineup__box > div.lineup__main
+
+% match 1 lineup box home team
+#main-content > div.lineups > div:nth-child(1) > div.lineup__box > div.lineup__main > ul.lineup__list.is-home
+
+% match 1 lineup box away team
+#main-content > div.lineups > div:nth-child(1) > div.lineup__box > div.lineup__main > ul.lineup__list.is-visit
+
+% home lineup player 1 and 2
+#main-content > div.lineups > div:nth-child(1) > div.lineup__box > div.lineup__main > ul.lineup__list.is-home > li:nth-child(2)
+#main-content > div.lineups > div:nth-child(1) > div.lineup__box > div.lineup__main > ul.lineup__list.is-home > li:nth-child(3)
+
+% player position code
+#main-content > div.lineups > div:nth-child(1) > div.lineup__box > div.lineup__main > ul.lineup__list.is-home > li:nth-child(2) > div
+
+% player name
+#main-content > div.lineups > div:nth-child(1) > div.lineup__box > div.lineup__main > ul.lineup__list.is-home > li:nth-child(2) > a
