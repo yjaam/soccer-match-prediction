@@ -1,8 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
-import difflib
-import re
+from datetime import datetime
 
 # Manual mapping dictionary for edge cases
 MANUAL_NAME_MAP = {
@@ -35,184 +34,191 @@ MANUAL_NAME_MAP = {
     'Javi Martinez': 'Javier Martinez Aginaga', '': ''
 }
 
-SIMILARITY_THRESHOLD = 0.8
+# FIFA version release dates (approximate September/October of each year)
+FIFA_VERSION_DATES = {
+    15: datetime(2014, 9, 1),
+    16: datetime(2015, 9, 1),
+    17: datetime(2016, 9, 1),
+    18: datetime(2017, 9, 1),
+    19: datetime(2018, 9, 1),
+    20: datetime(2019, 9, 1),
+    21: datetime(2020, 10, 1),
+    22: datetime(2021, 10, 1),
+    23: datetime(2022, 9, 1),
+    24: datetime(2023, 9, 1),
+    25: datetime(2024, 9, 1),
+    26: datetime(2025, 9, 1),
+}
 
-def format_column_name(col):
+
+def get_fifa_version_for_date(match_date):
     """
-    Converts dynamically generated column names into the requested standardized format.
-    Example: 'Home_Defender_Avg_Value' -> 'home_market_value_Defenders'
-    Example: 'Away_Midfielder_pace_Avg' -> 'away_rating_pace_Midfielders'
+    Find the closest FIFA version available for a given date.
+    Returns the FIFA version number that should be used for that date.
     """
-    if col in ['Date', 'Home Team', 'Away Team']:
-        return col
+    if isinstance(match_date, str):
+        match_date = pd.to_datetime(match_date)
+    
+    # Find the FIFA version closest to (but not after) the match date
+    applicable_versions = {v: date for v, date in FIFA_VERSION_DATES.items() if date <= match_date}
+    
+    if not applicable_versions:
+        # If match is before FIFA 15, use FIFA 15
+        return 15
+    
+    # Return the latest version that applies to this date
+    return max(applicable_versions.keys())
 
-    parts = col.split('_')
-    if len(parts) < 3:
-        return col
-
-    team = parts[0].lower() # 'home' or 'away'
-    pos = parts[1]
-
-    # Pluralize field players
-    if pos == 'Defender': pos = 'Defenders'
-    elif pos == 'Midfielder': pos = 'Midfielders'
-    elif pos == 'Attacker': pos = 'Attackers'
-
-    if 'Avg_Value' in col:
-        return f"{team}_market_value_{pos}"
-    elif 'Avg' in col:
-        # Extract the stat name which is sitting between Position and 'Avg'
-        stat = "_".join(parts[2:-1])
-        return f"{team}_rating_{stat}_{pos}"
-
-    return col
 
 def process_fifa_ratings():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     lineups_path = os.path.join(script_dir, 'data', 'lineups.csv')
-    values_path = os.path.join(script_dir, 'data', 'lineups_values.csv') 
-    fifa_path = os.path.join(script_dir, 'fifa_data', 'male_players.csv')
-    output_path = os.path.join(script_dir, 'data', 'lineups_values_ratings.csv') 
+    values_path = os.path.join(script_dir, 'data', 'lineups_values.csv')
+    player_ratings_path = os.path.join(script_dir, 'fifa_ratings', 'player_ratings.csv')
+    output_path = os.path.join(script_dir, 'data', 'lineups_values_ratings.csv')
 
     try:
-        df_lineups = pd.read_csv(lineups_path) 
-        df_values = pd.read_csv(values_path)   
-        
-        fifa_cols = ['short_name', 'overall', 'pace', 'shooting', 'passing', 'dribbling', 'defending', 'physic',
-                     'goalkeeping_diving', 'goalkeeping_handling', 'goalkeeping_kicking', 
-                     'goalkeeping_positioning', 'goalkeeping_reflexes', 'goalkeeping_speed']
-        df_fifa = pd.read_csv(fifa_path, usecols=lambda c: c in fifa_cols)
+        df_lineups = pd.read_csv(lineups_path)
+        df_values = pd.read_csv(values_path)
+        df_player_ratings = pd.read_csv(player_ratings_path)
     except FileNotFoundError as e:
-        print(f"Error loading files: {e}\nMake sure lineups.csv, lineups_values.csv, and male_players.csv exist.")
+        print(f"Error loading files: {e}")
+        print(f"Make sure lineups.csv, lineups_values.csv, and fifa_ratings/player_ratings.csv exist.")
         return
 
-    # Sort players by overall rating descending to prioritize top-flight players
-    df_fifa = df_fifa.sort_values(by='overall', ascending=False)
+    print("Loading player ratings data...")
+    # Convert fifa_version to int for easier comparison
+    df_player_ratings['fifa_version'] = df_player_ratings['fifa_version'].astype(int)
     
-    # Build a highly optimized lookup dictionary mapping names to stats
-    fifa_map = {}
-    
-    for _, row in df_fifa.iterrows():
-        if pd.isna(row['short_name']):
-            continue
-            
-        orig_name = row['short_name']
-        # Remove "X. " or "X. Y. " from the start of the string for exact matching against scraped last names
-        clean_name = re.sub(r'^([A-Z]\.\s*)+', '', orig_name)
-        
-        stats_dict = row.to_dict()
-        
-        if orig_name not in fifa_map:
-            fifa_map[orig_name] = stats_dict
-            
-        if clean_name not in fifa_map:
-            fifa_map[clean_name] = stats_dict
-
-    all_fifa_names = list(fifa_map.keys())
+    # Create lookup dictionaries for each FIFA version
+    # This will speed up player lookups significantly
+    fifa_lookups = {}
+    for fifa_ver in sorted(df_player_ratings['fifa_version'].unique()):
+        df_ver = df_player_ratings[df_player_ratings['fifa_version'] == fifa_ver]
+        # Create a mapping of player name to their ratings
+        fifa_lookups[fifa_ver] = {}
+        for _, row in df_ver.iterrows():
+            player_name = row['short_name']
+            fifa_lookups[fifa_ver][player_name] = row.to_dict()
+        print(f"  Loaded FIFA {fifa_ver}: {len(fifa_lookups[fifa_ver])} players")
 
     match_stats = {'exact_or_manual': 0, 'fuzzy': 0, 'missing': 0}
     missing_players = []
 
-    def get_player_stats(raw_name):
-        mapped_name = MANUAL_NAME_MAP.get(raw_name, raw_name)
+    def get_player_stats_for_version(player_name, fifa_version):
+        """Get player stats from a specific FIFA version."""
+        if fifa_version not in fifa_lookups:
+            return None, 'missing'
         
-        # 1. Exact Match
-        if mapped_name in fifa_map:
-            return fifa_map[mapped_name], 'exact_or_manual'
-            
-        # 2. Exact Match on just the Last Word
+        # Apply manual mapping
+        mapped_name = MANUAL_NAME_MAP.get(player_name, player_name)
+        
+        # Try exact match
+        if mapped_name in fifa_lookups[fifa_version]:
+            return fifa_lookups[fifa_version][mapped_name], 'exact_or_manual'
+        
+        # Try last word match
         last_word = mapped_name.split()[-1]
-        if last_word in fifa_map:
-            return fifa_map[last_word], 'exact_or_manual'
-            
-        # 3. Fuzzy Match
-        closest_matches = difflib.get_close_matches(mapped_name, all_fifa_names, n=1, cutoff=SIMILARITY_THRESHOLD)
-        if closest_matches:
-            return fifa_map[closest_matches[0]], 'fuzzy'
-            
-        # 4. Fuzzy Match on just the last word
-        closest_last_word = difflib.get_close_matches(last_word, all_fifa_names, n=1, cutoff=SIMILARITY_THRESHOLD)
-        if closest_last_word:
-            return fifa_map[closest_last_word[0]], 'fuzzy'
-            
+        for player_key, stats in fifa_lookups[fifa_version].items():
+            if player_key.endswith(last_word):
+                return stats, 'exact_or_manual'
+        
         return None, 'missing'
 
-    def get_group_stats(row, prefix, group_name):
+    def get_group_stats(row, prefix, group_name, fifa_version):
+        """
+        Calculate average stats for a group of players for a specific position and team.
+        Uses the specified FIFA version.
+        """
+        # Find columns matching this group
         cols = [col for col in df_lineups.columns if col.startswith(f"{prefix}{group_name}")]
         
         if group_name == 'Goalkeeper':
-            stat_keys = ['overall', 'goalkeeping_diving', 'goalkeeping_handling', 'goalkeeping_kicking', 
-                         'goalkeeping_positioning', 'goalkeeping_reflexes', 'goalkeeping_speed']
+            stat_keys = ['overall', 'goalkeeping_diving', 'goalkeeping_handling', 'goalkeeping_kicking',
+                        'goalkeeping_positioning', 'goalkeeping_reflexes', 'goalkeeping_speed']
         else:
             stat_keys = ['overall', 'pace', 'shooting', 'passing', 'dribbling', 'defending', 'physic']
-            
+        
         collected_stats = {key: [] for key in stat_keys}
         
         for col in cols:
             player_name = str(row[col]).strip()
             
             if player_name and player_name.lower() != 'nan':
-                stats_dict, match_type = get_player_stats(player_name)
+                stats_dict, match_type = get_player_stats_for_version(player_name, fifa_version)
                 
                 if stats_dict is not None:
                     match_stats[match_type] += 1
                     for key in stat_keys:
-                        val = stats_dict.get(key, np.nan)
+                        val = stats_dict.get(key)
                         if pd.notna(val):
-                            collected_stats[key].append(val)
+                            try:
+                                collected_stats[key].append(float(val))
+                            except (ValueError, TypeError):
+                                pass
                 else:
                     match_stats['missing'] += 1
                     missing_players.append(player_name)
-
+        
+        # Calculate averages
         result_avgs = {}
         for key in stat_keys:
             col_name = f"{prefix}{group_name}_{key}_Avg"
             if collected_stats[key]:
                 result_avgs[col_name] = round(np.mean(collected_stats[key]), 2)
             else:
-                result_avgs[col_name] = ""
-                
+                result_avgs[col_name] = np.nan
+        
         return result_avgs
 
+    # Process each match
+    print("\nProcessing matches and calculating averaged FIFA ratings...")
     fifa_results = []
-    print("Processing games and matching FIFA stats... (This might take a few seconds due to fuzzy matching)")
     
-    for _, row in df_lineups.iterrows():
+    for idx, row in df_lineups.iterrows():
+        match_date = row.get('Date', '')
+        fifa_version = get_fifa_version_for_date(match_date)
+        
         match_summary = {
             'Date': row.get('Date', ''),
             'Home Team': row.get('Home Team', ''),
-            'Away Team': row.get('Away Team', '')
+            'Away Team': row.get('Away Team', ''),
+            'FIFA_Version_Used': fifa_version
         }
         
+        # Process home and away teams
         for prefix in ['Home_', 'Away_']:
             for position in ['Goalkeeper', 'Defender', 'Midfielder', 'Attacker']:
-                group_averages = get_group_stats(row, prefix, position)
+                group_averages = get_group_stats(row, prefix, position, fifa_version)
                 match_summary.update(group_averages)
-                
+        
         fifa_results.append(match_summary)
+        
+        if (idx + 1) % 500 == 0:
+            print(f"  Processed {idx + 1}/{len(df_lineups)} matches...")
 
     df_fifa_results = pd.DataFrame(fifa_results)
     
-    # Merge the new FIFA columns with the existing market values columns
+    # Merge FIFA ratings with market values
+    print("Merging FIFA ratings with market values...")
     df_combined = pd.merge(df_values, df_fifa_results, on=['Date', 'Home Team', 'Away Team'], how='left')
 
-    # Apply the column renaming logic
-    df_combined = df_combined.rename(columns=lambda c: format_column_name(c))
-
-    # Save logic
+    # Save the result
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df_combined.to_csv(output_path, index=False, encoding='utf-8-sig')
     
-    print("\n--- FIFA Ratings Calculation Complete ---")
+    print("\n--- FIFA Ratings Processing Complete ---")
     print(f"Total player ratings found via exact/manual match: {match_stats['exact_or_manual']}")
-    print(f"Total player ratings found via fuzzy match:        {match_stats['fuzzy']}")
     print(f"Total player ratings missing:                      {match_stats['missing']}")
     
     if match_stats['missing'] > 0:
-        print(f"Sample of missing players: {list(set(missing_players))[:10]}")
+        unique_missing = list(set(missing_players))
+        print(f"Sample of missing players: {unique_missing[:10]}")
     
-    print(f"\nSuccessfully merged market values and FIFA ratings!")
-    print(f"Saved combined summary to: {output_path}")
+    print(f"\nProcessed {len(df_lineups)} matches")
+    print(f"Output columns: {len(df_combined.columns)}")
+    print(f"Saved to: {output_path}")
+
 
 if __name__ == "__main__":
     process_fifa_ratings()

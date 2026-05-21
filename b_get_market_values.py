@@ -36,6 +36,8 @@ MANUAL_NAME_MAP = {
 
 # Tweak this to be more strict (> 0.85) or more relaxed (< 0.75)
 SIMILARITY_THRESHOLD = 0.8
+THRESHOLD_STEP = 0.05
+MIN_THRESHOLD = 0.5
 
 def process_lineup_values():
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -64,64 +66,83 @@ def process_lineup_values():
     ))
     
     value_map = {**last_name_map, **full_name_map}
-    
-    # Pre-extract all candidate names to run fuzzy matching against
     all_player_names = list(value_map.keys())
 
+    print("Extracting unique player names from lineups...")
+    
+    # Extract all unique player names from lineups once
+    unique_players = set()
+    player_cols = [col for col in df_lineups.columns if col not in ['Competition', 'Date', 'Home Team', 'Away Team']]
+    
+    for col in player_cols:
+        for name in df_lineups[col].dropna():
+            name_str = str(name).strip()
+            if name_str and name_str.lower() != 'nan':
+                unique_players.add(name_str)
+    
+    print(f"Found {len(unique_players)} unique player names to match")
+    print("Matching player names with threshold fallback...")
+    
+    # Match all unique players once with threshold fallback
+    player_matches = {}
     match_stats = {'exact_or_manual': 0, 'fuzzy': 0, 'missing': 0}
-    missing_players = [] 
-
-    def get_player_value(raw_name):
+    current_threshold = SIMILARITY_THRESHOLD
+    
+    for i, raw_name in enumerate(unique_players):
+        if (i + 1) % 1000 == 0:
+            print(f"  Processed {i + 1}/{len(unique_players)} unique players...")
+        
+        if raw_name in player_matches:
+            continue
+        
         mapped_name = MANUAL_NAME_MAP.get(raw_name, raw_name)
+        matched_value = None
+        match_type = 'missing'
         
         # 1. Try Exact Match (Against full name or last name)
         if mapped_name in value_map:
-            return value_map[mapped_name], 'exact_or_manual'
-            
-        # 2. Try Exact Match on just the Last Word (e.g., 'N. Schlotterbeck' -> 'Schlotterbeck')
-        last_word = mapped_name.split()[-1]
-        if last_word in value_map:
-            return value_map[last_word], 'exact_or_manual'
-            
-        # 3. Fuzzy Match (Similarity Score)
-        # Check against full name first
-        closest_matches = difflib.get_close_matches(mapped_name, all_player_names, n=1, cutoff=SIMILARITY_THRESHOLD)
-        if closest_matches:
-            return value_map[closest_matches[0]], 'fuzzy'
-            
-        # 4. Fuzzy Match on just the last word
-        closest_last_word = difflib.get_close_matches(last_word, all_player_names, n=1, cutoff=SIMILARITY_THRESHOLD)
-        if closest_last_word:
-            return value_map[closest_last_word[0]], 'fuzzy'
-            
-        return np.nan, 'missing'
-
-    def get_group_average(row, prefix, group_name):
-        cols = [col for col in df_lineups.columns if col.startswith(f"{prefix}{group_name}")]
-        group_values = []
+            matched_value = value_map[mapped_name]
+            match_type = 'exact_or_manual'
+        else:
+            # 2. Try Exact Match on just the Last Word
+            last_word = mapped_name.split()[-1]
+            if last_word in value_map:
+                matched_value = value_map[last_word]
+                match_type = 'exact_or_manual'
+            else:
+                # 3. Fuzzy Match with progressive threshold lowering
+                threshold = SIMILARITY_THRESHOLD
+                while threshold >= MIN_THRESHOLD and matched_value is None:
+                    closest_matches = difflib.get_close_matches(mapped_name, all_player_names, n=1, cutoff=threshold)
+                    if closest_matches:
+                        matched_value = value_map[closest_matches[0]]
+                        match_type = 'fuzzy'
+                        break
+                    
+                    # Try fuzzy on last word
+                    closest_last_word = difflib.get_close_matches(last_word, all_player_names, n=1, cutoff=threshold)
+                    if closest_last_word:
+                        matched_value = value_map[closest_last_word[0]]
+                        match_type = 'fuzzy'
+                        break
+                    
+                    threshold = round(threshold - THRESHOLD_STEP, 2)
         
-        for col in cols:
-            player_name = str(row[col]).strip()
-            
-            if player_name and player_name.lower() != 'nan':
-                val, match_type = get_player_value(player_name)
-                
-                if pd.notna(val):
-                    group_values.append(val)
-                    match_stats[match_type] += 1
-                else:
-                    match_stats['missing'] += 1
-                    missing_players.append(player_name)
-        
-        if group_values:
-            return round(np.mean(group_values), 2)
-        return ""
-
+        player_matches[raw_name] = matched_value if pd.notna(matched_value) else np.nan
+        match_stats[match_type] += 1
+    
+    print(f"\nMatching complete!")
+    print(f"  Exact/manual matches: {match_stats['exact_or_manual']}")
+    print(f"  Fuzzy matches:        {match_stats['fuzzy']}")
+    print(f"  Missing values:       {match_stats['missing']}")
+    
+    # Now compute averages in a single pass using cached matches
+    print("\nComputing position averages...")
     results = []
-    print("Processing games and matching player names... (This might take a few seconds due to fuzzy matching)")
     
     for _, row in df_lineups.iterrows():
         match_summary = {
+            'Competition': row.get('Competition', ''),
             'Date': row.get('Date', ''),
             'Home Team': row.get('Home Team', ''),
             'Away Team': row.get('Away Team', '')
@@ -129,26 +150,31 @@ def process_lineup_values():
         
         for prefix in ['Home_', 'Away_']:
             for position in ['Goalkeeper', 'Defender', 'Midfielder', 'Attacker']:
-                avg_val = get_group_average(row, prefix, position)
-                match_summary[f'{prefix}{position}_Avg_Value'] = avg_val
+                cols = [col for col in df_lineups.columns if col.startswith(f"{prefix}{position}")]
+                group_values = []
                 
+                for col in cols:
+                    player_name = str(row[col]).strip()
+                    if player_name and player_name.lower() != 'nan':
+                        val = player_matches.get(player_name, np.nan)
+                        if pd.notna(val):
+                            group_values.append(val)
+                
+                avg_val = round(np.mean(group_values), 2) if group_values else ""
+                match_summary[f'{prefix}{position}_Avg_Value'] = avg_val
+        
         results.append(match_summary)
-
-    # Save logic
+    
+    # Save results
     df_results = pd.DataFrame(results)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df_results.to_csv(output_path, index=False, encoding='utf-8-sig')
     
     # Print statistics
-    print("\n--- Scraping & Calculation Complete ---")
-    print(f"Total player values found via exact/manual match: {match_stats['exact_or_manual']}")
-    print(f"Total player values found via fuzzy match:        {match_stats['fuzzy']}")
-    print(f"Total player values missing:                      {match_stats['missing']}")
-    
-    if match_stats['missing'] > 0:
-        print(f"Sample of remaining missing players: {list(set(missing_players))[:10]}")
-    
-    print(f"\nSaved summary to: {output_path}")
+    print("\n--- Processing Complete ---")
+    print(f"Unique players matched: {len(player_matches)}")
+    print(f"Games processed: {len(df_results)}")
+    print(f"Saved summary to: {output_path}")
 
 if __name__ == "__main__":
     process_lineup_values()

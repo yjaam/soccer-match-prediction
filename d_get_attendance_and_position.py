@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
+import unicodedata
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -37,6 +38,32 @@ team_mapping = {
     'SpVgg Greuther Fürth': 'Greuther Fürth'
 }
 
+# Map lineups `Competition` values to transfermarkt `domestic_competition_id`
+COMPETITION_TO_TM_ID = {
+    'bundesliga': 'L1',
+    'premier-league': 'GB1',
+    'premier league': 'GB1',
+    'laliga': 'ES1',
+    'la liga': 'ES1',
+    'la-liga': 'ES1',
+    'serie-a': 'IT1',
+    'serie a': 'IT1',
+    'ligue-1': 'FR1',
+    'ligue 1': 'FR1',
+    'ligue1': 'FR1'
+}
+
+def strip_accents(text: str) -> str:
+    if text is None:
+        return ''
+    s = unicodedata.normalize('NFKD', str(text))
+    return ''.join(ch for ch in s if not unicodedata.combining(ch))
+
+def comp_to_tm_id(comp: str):
+    if pd.isna(comp):
+        return None
+    return COMPETITION_TO_TM_ID.get(str(comp).lower().strip())
+
 def assert_exists(path: Path, label: str):
     if not path.exists():
         raise FileNotFoundError(
@@ -49,19 +76,28 @@ def safe_contains(series: pd.Series, pattern: str) -> pd.Series:
     # regex=False avoids regex edge cases in team names
     return series.astype(str).str.contains(pattern, case=False, na=False, regex=False)
 
-def get_club_id(name, clubs_df):
+def get_club_id(name, clubs_df, competition=None):
     if pd.isna(name):
         return None
 
     name_str = str(name).strip()
+    # prefer filtering clubs by domestic competition when available
+    tm_comp = comp_to_tm_id(competition)
+    if tm_comp:
+        clubs_subset = clubs_df[clubs_df['domestic_competition_id'] == tm_comp]
+        # if subset empty, fall back to full clubs_df
+        if clubs_subset.empty:
+            clubs_subset = clubs_df
+    else:
+        clubs_subset = clubs_df
 
-    # 1) direct mapped lookup
+    # 1) direct mapped lookup (legacy)
     mapped_name = team_mapping.get(name_str)
     if mapped_name:
         mapped_code = mapped_name.lower().replace(' ', '-')
-        match = clubs_df[
-            safe_contains(clubs_df['name'], mapped_name) |
-            safe_contains(clubs_df['club_code'], mapped_code)
+        match = clubs_subset[
+            safe_contains(clubs_subset['name'], mapped_name) |
+            safe_contains(clubs_subset['club_code'], mapped_code)
         ]
         if not match.empty:
             return match.iloc[0]['club_id']
@@ -76,7 +112,7 @@ def get_club_id(name, clubs_df):
         .strip()
     )
 
-    match = clubs_df[safe_contains(clubs_df['name'], clean_name)]
+    match = clubs_subset[safe_contains(clubs_subset['name'], clean_name)]
     if not match.empty:
         return match.iloc[0]['club_id']
 
@@ -86,7 +122,7 @@ def get_club_id(name, clubs_df):
         token = token.strip()
         if len(token) <= 3:
             continue
-        match = clubs_df[safe_contains(clubs_df['name'], token)]
+        match = clubs_subset[safe_contains(clubs_subset['name'], token)]
         if not match.empty:
             return match.iloc[0]['club_id']
 
@@ -111,9 +147,16 @@ def main():
     games_df['date'] = pd.to_datetime(games_df['date'], errors='coerce')
     games_df = games_df.sort_values(by='date', ascending=False)
 
-    print("Mapping club IDs...")
-    lineups_df['home_club_id'] = lineups_df['Home Team'].apply(lambda x: get_club_id(x, clubs_df))
-    lineups_df['away_club_id'] = lineups_df['Away Team'].apply(lambda x: get_club_id(x, clubs_df))
+    print("Mapping club IDs (league-aware)...")
+    # apply with access to the Competition column so we can filter clubs by domestic league
+    lineups_df['home_club_id'] = lineups_df.apply(
+        lambda r: get_club_id(r['Home Team'], clubs_df, r.get('Competition') if 'Competition' in r else None),
+        axis=1
+    )
+    lineups_df['away_club_id'] = lineups_df.apply(
+        lambda r: get_club_id(r['Away Team'], clubs_df, r.get('Competition') if 'Competition' in r else None),
+        axis=1
+    )
 
     attendances = []
     home_positions = []

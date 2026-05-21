@@ -5,46 +5,22 @@ import os
 import numpy as np
 import pandas as pd
 
-# -------------------------------------------------------------------
-# Team name mapping: lineup name -> Understat name
-# Extend this dictionary if needed.
-# -------------------------------------------------------------------
-TEAM_NAME_MAP = {
-    "Bayern Munich": "Bayern Munich",
-    "FC Bayern München": "Bayern Munich",
-    "Bayer 04 Leverkusen": "Bayer Leverkusen",
-    "RB Leipzig": "RB Leipzig",
-    "Borussia Dortmund": "Borussia Dortmund",
-    "Eintracht Frankfurt": "Eintracht Frankfurt",
-    "SC Freiburg": "SC Freiburg",
-    "FSV Mainz 05": "Mainz 05",
-    "1. FSV Mainz 05": "Mainz 05",
-    "VfL Wolfsburg": "Wolfsburg",
-    "Borussia Mönchengladbach": "B. Monchengladbach",
-    "TSG Hoffenheim": "Hoffenheim",
-    "TSG 1899 Hoffenheim": "Hoffenheim",
-    "FC Augsburg": "Augsburg",
-    "VfB Stuttgart": "Stuttgart",
-    "Werder Bremen": "Werder Bremen",
-    "SV Werder Bremen": "Werder Bremen",
-    "Union Berlin": "Union Berlin",
-    "1. FC Union Berlin": "Union Berlin",
-    "VfL Bochum": "Bochum",
-    "VfL Bochum 1848": "Bochum",
-    "1. FC Köln": "FC Koln",
-    "FC Köln": "FC Koln",
-    "Heidenheim": "Heidenheim",
-    "1. FC Heidenheim": "Heidenheim",
-    "FC St. Pauli": "St. Pauli",
-    "Holstein Kiel": "Holstein Kiel",
-    # fallback: identity mapping handled in function
-}
+from team_name_resolver import TeamNameResolver
 
-def map_team_name(name: str) -> str:
-    if pd.isna(name):
-        return name
-    n = str(name).strip()
-    return TEAM_NAME_MAP.get(n, n)
+def load_canonical_team_names() -> list[str]:
+    """Load the canonical team vocabulary from the xG file.
+
+    The xG CSV already contains the previously established correct team names,
+    so this script should resolve lineup names into that vocabulary instead of
+    maintaining a separate Bundesliga-specific manual map.
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    xg_path = os.path.join(script_dir, "data", "big5_xg_clean.csv")
+    xg = pd.read_csv(xg_path)
+
+    home_names = xg["home_team_mapped"].dropna().astype(str)
+    away_names = xg["away_team_mapped"].dropna().astype(str)
+    return sorted(set(home_names).union(set(away_names)))
 
 def weighted_form(values, weights=(5,4,3,2,1)):
     """
@@ -98,8 +74,8 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     lineup_path = os.path.join(script_dir, "data", "lineups_values_ratings_games.csv")
-    xg_path = os.path.join(script_dir, "data", "bundesliga_xg_clean.csv")
-    out_path = os.path.join(script_dir, "data", "data_for_pca.csv")
+    xg_path = os.path.join(script_dir, "data", "big5_xg_clean.csv")
+    forms_out_path = os.path.join(script_dir, "data", "lineups_values_ratings_games_forms.csv")
 
     # -------------------------
     # Load data
@@ -114,13 +90,22 @@ def main():
     # Drop invalid xg rows
     xg = xg.dropna(subset=["date", "home_team", "away_team"]).copy()
 
-    # Map team names on both sides
-    # lineup columns expected: "Home Team", "Away Team"
-    df["home_team_mapped"] = df["Home Team"].apply(map_team_name)
-    df["away_team_mapped"] = df["Away Team"].apply(map_team_name)
+    canonical_team_names = load_canonical_team_names()
+    resolver = TeamNameResolver(target_names=canonical_team_names, min_fuzzy_score=82)
 
-    xg["home_team_mapped"] = xg["home_team"].apply(map_team_name)
-    xg["away_team_mapped"] = xg["away_team"].apply(map_team_name)
+    # Map lineup team names into the canonical xG vocabulary.
+    df["home_team_mapped"] = df["Home Team"].apply(lambda x: resolver.resolve(x) if pd.notna(x) else x)
+    df["away_team_mapped"] = df["Away Team"].apply(lambda x: resolver.resolve(x) if pd.notna(x) else x)
+
+    # Keep the already canonical xG names as-is.
+    xg["home_team_mapped"] = xg["home_team"].apply(lambda x: resolver.resolve(x) if pd.notna(x) else x)
+    xg["away_team_mapped"] = xg["away_team"].apply(lambda x: resolver.resolve(x) if pd.notna(x) else x)
+
+    # Preserve original names if resolver returns None for unexpected cases.
+    df["home_team_mapped"] = df["home_team_mapped"].fillna(df["Home Team"])
+    df["away_team_mapped"] = df["away_team_mapped"].fillna(df["Away Team"])
+    xg["home_team_mapped"] = xg["home_team_mapped"].fillna(xg["home_team"])
+    xg["away_team_mapped"] = xg["away_team_mapped"].fillna(xg["away_team"])
 
     # Build xG histories
     team_hist = build_team_histories(xg)
@@ -155,17 +140,17 @@ def main():
     df["home_form"] = home_forms
     df["away_form"] = away_forms
 
-    # Cleanup helper cols
-    df = df.drop(columns=["home_team_mapped", "away_team_mapped"], errors="ignore")
+    # Remove temporary helpers before writing any pipeline outputs.
+    df_full = df.drop(columns=["home_team_mapped", "away_team_mapped"], errors="ignore").copy()
 
-    # Save
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    df.to_csv(out_path, index=False, encoding="utf-8-sig")
+    # Save the full forms dataset as the only output of this stage.
+    os.makedirs(os.path.dirname(forms_out_path), exist_ok=True)
+    df_full.to_csv(forms_out_path, index=False, encoding="utf-8-sig")
 
-    print(f"Saved: {out_path}")
-    print(f"Rows: {len(df)}")
-    print(f"home_form non-null: {df['home_form'].notna().sum()}")
-    print(f"away_form non-null: {df['away_form'].notna().sum()}")
+    print(f"Saved full forms CSV: {forms_out_path}")
+    print(f"Rows: {len(df_full)}")
+    print(f"home_form non-null: {df_full['home_form'].notna().sum()}")
+    print(f"away_form non-null: {df_full['away_form'].notna().sum()}")
 
 if __name__ == "__main__":
     main()

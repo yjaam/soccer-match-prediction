@@ -1,0 +1,32 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2868
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 HelveticaNeue;}
+{\colortbl;\red255\green255\blue255;\red25\green25\blue25;}
+{\*\expandedcolortbl;;\cssrgb\c12941\c12941\c12941;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 notes masterarbeit\
+\
+datenbasis: big5 ligen, viele jahre wie es geht\
+alle features (eg wetter, in-game statistiken)\
+\
+ziel: echtzeitvorhersage, mit explainability (SHAP, variable importance)\
+Aufstellungen: vorhergesagt und echt (kurz vor spiel)\
+\
+\
+Skellam verteilung (differenz zweier poisson ZF) -> Verteilungsregression, neuronales netz \
+Datenexperimente , vergleich mit Baselines, unterschiedl. Daten\
+\
+Wettmarkt analyse: Threshold setzen f\'fcr wett-abschluss, gemessen an Gewinn\
+\
+############\
+\pard\pardeftab720\sa300\partightenfactor0
+
+\f1\fs22 \cf2 \expnd0\expndtw0\kerning0
+\ul \ulc2 Datenbasis\ulnone : Top5 Ligen Herren (xG, Fbref-Daten, FIFA-Videospiel-Daten)*, m\'f6glichst viele Jahre*\
+\ul Data-Engineering:\ulnone  Group-PCAs (\'e4hnlich) wie bei Ivo, log-Ratios von diesen PCAs, fehlende Schl\'fcsselspieler Variable, Taktik-PCA (letzten 3 bei Niklas dann nachlesbar, kl\'e4re noch die Weitergabe), F\'c4LLT UNS NOCH WAS EIN? (GGF. LITERATUR*)\
+\ul Methodische Grund-Idee\ulnone : neuronales Netz (wegen starker Vorhersage-F\'e4higkeit durch Ber\'fccksichtigung aller Interaktionen) f\'fcr Skellam Verteilung (Tore und Ausgang zusammen modellierbar, Handout im Anhang)\'a0 \'a0(schnell implementierbar?*)\'a0\
+\ul Baselines\ulnone  (geringer Aufwand): Mannschafts-Marktwerte, wenige wichtige Features in linearer Skellam-Regression nutzen\
+\ul Daten-Experimente\ulnone  statt Simulationen: Gewichte zu Spielausgang, Zeit-Handling (Gewichte?), Ligen getrennt trainieren, IDEEN?\
+\ul Wettmarkt-Analse\ulnone : H\'e4tte das Modell gewonnen? SUCHE NACH OPTIMALEN/GEWINN-MAXIMIERENDEN INDIKATOREN DES MODELLS\
+\ul Ergebnis\ulnone : Vorhersage zum n\'e4chsten Spieltag mit (am besten) Shap-Values, SHAP VALUES als Flie\'dftext VERBALISIEREN, in einem online Tool einbinden (Shiny w\'e4re vermutlich leicht, einfach Template benutzen), UDPATE JEDE WOCHE AUTOMATISIERT*}

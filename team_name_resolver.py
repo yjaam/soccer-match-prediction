@@ -9,6 +9,9 @@ STOPWORDS = {
     "fussball", "fuball", "club", "clubb", "ev", "ag", "gmbh", "von", "zu"
 }
 
+# Add a few more common abbreviations encountered in Big-5 sources
+STOPWORDS.update({"cf", "ac", "cd", "ssc"})
+
 # Add/extend with your known difficult mappings:
 ALIASES = {
     "fc bayern munchen": "bayern munich",
@@ -26,6 +29,31 @@ ALIASES = {
     "st pauli": "st pauli",
     "fc st pauli": "st pauli",
 }
+
+# Common Big-5 aliases (non-exhaustive) to improve matching across sources
+ALIASES.update({
+    "man united": "manchester united",
+    "man utd": "manchester united",
+    "manchester utd": "manchester united",
+    "man city": "manchester city",
+    "spurs": "tottenham hotspur",
+    "tottenham": "tottenham hotspur",
+    "atletico de madrid": "atletico madrid",
+    "atlético de madrid": "atletico madrid",
+    "real madrid cf": "real madrid",
+    "ac milan": "milan",
+    "inter milan": "inter",
+    "internazionale": "inter",
+    "ssc napoli": "napoli",
+    "auxerre": "association de la jeunesse auxerroise",
+    "borussia m gladbach": "borussia verein für leibesübungen 1900 mönchengladbach",
+    "evian thonon gaillard": "thonon évian grand genève fc",
+    "fc cologne": "1. fußball-club köln",
+    "greuther fuerth": "spvgg greuther fürth",
+    "nuernberg": "1.fc nuremberg",
+    "nice": "olympique gymnaste club nice côte d'azur",
+    "rennes": "stade rennais football club",
+})
 
 def strip_accents(text: str) -> str:
     text = unicodedata.normalize("NFKD", text)

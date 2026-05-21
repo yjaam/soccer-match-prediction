@@ -18,25 +18,78 @@ def parse_matchday(m):
     return pd.NA
 
 
+def load_main_team_names() -> list[str]:
+    """Load the canonical team vocabulary from the main game CSV."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    main_path = os.path.join(script_dir, "data", "lineups_values_ratings_games.csv")
+    main_df = pd.read_csv(main_path)
+    home_names = main_df["Home Team"].dropna().astype(str)
+    away_names = main_df["Away Team"].dropna().astype(str)
+    return sorted(set(home_names).union(set(away_names)))
+
+
 def fetch_league_season_matches(league_name: str, seasons):
     """
     Fetch match data for explicit season start years.
     Returns list of rows in unified format.
     """
     understat = UnderstatClient()
-    league = understat.league(league=league_name)
+    # Candidates for common display names mapped to potential Understat identifiers.
+    LEAGUE_CANDIDATES = {
+        "Premier League": ["Premier League", "EPL", "premier-league", "england"],
+        "La Liga": ["La Liga", "LaLiga", "La_Liga", "laliga", "spain"],
+        "Serie A": [
+            "Serie A",
+            "SerieA",
+            "Serie_A",
+            "serie-a",
+            "serie_a",
+            "italy",
+            "italia",
+            "Serie A TIM",
+            "Serie A TIM",
+            "SERIE A",
+        ],
+        "Ligue 1": [
+            "Ligue 1",
+            "Ligue1",
+            "Ligue_1",
+            "ligue-1",
+            "ligue_1",
+            "france",
+            "Ligue 1 Uber Eats",
+            "Ligue1UberEats",
+            "Ligue1_UberEats",
+        ],
+        "Bundesliga": ["Bundesliga", "bundesliga"],
+    }
+
+    candidates = LEAGUE_CANDIDATES.get(league_name, [league_name])
 
     rows = []
     for s in seasons:
         season_str = str(s)
-        try:
-            matches = league.get_match_data(season=season_str)
-        except Exception as e:
-            print(f"[WARN] {league_name} season {season_str} skipped: {e}")
+        matches = None
+        used_candidate = None
+
+        for cand in candidates:
+            try:
+                league = understat.league(league=cand)
+                matches = league.get_match_data(season=season_str)
+                used_candidate = cand
+            except Exception:
+                matches = None
+
+            # if we got results (even empty list), stop trying other candidates
+            if matches is not None:
+                break
+
+        if matches is None:
+            print(f"[WARN] {league_name} season {season_str} skipped: no valid league identifier found among candidates {candidates}")
             continue
 
         if not matches:
-            print(f"[INFO] {league_name} season {season_str}: no matches returned.")
+            print(f"[INFO] {league_name} season {season_str}: no matches returned (tried '{used_candidate}').")
             continue
 
         for m in matches:
@@ -65,15 +118,25 @@ def fetch_league_season_matches(league_name: str, seasons):
 
 
 def fetch_bundesliga_xg_current_and_previous():
-    """
-    Default:
-      - current season start year = current calendar year
-      - previous season start year = current calendar year - 1
-      - leagues = Bundesliga + 2. Bundesliga
+    """Fetch xG for the Big-5 European leagues (previous + current season).
+
+    This generalises the previous Bundesliga-only helper to collect data
+    for the five major leagues: Premier League, La Liga, Serie A, Ligue 1
+    and Bundesliga.
     """
     current_year = datetime.today().year
-    seasons = [current_year - 1, current_year]  # previous + current
-    leagues = ["Bundesliga", "2. Bundesliga"]
+    # fetch all seasons from 2012 up to the current season start year
+    seasons = list(range(2012, current_year + 1))
+
+    # Understat league names used by the API client. These have worked with
+    # the prior code; adjust if your Understat client expects different strings.
+    leagues = [
+        "Premier League",
+        "La Liga",
+        "Serie A",
+        "Ligue 1",
+        "Bundesliga",
+    ]
 
     all_rows = []
     for lg in leagues:
@@ -92,28 +155,25 @@ def fetch_bundesliga_xg_current_and_previous():
     # Remove exact duplicates if any
     df = df.drop_duplicates(
         subset=["league", "season", "date", "home_team", "away_team"],
-        keep="first"
+        keep="first",
     )
 
     # Sort for stable downstream form-calculation
     df = df.sort_values(
         by=["date", "league", "season", "matchday", "home_team"],
-        na_position="last"
+        na_position="last",
     ).reset_index(drop=True)
 
     return df
 
 
-def add_canonical_team_names(df: pd.DataFrame) -> pd.DataFrame:
+def add_canonical_team_names(df: pd.DataFrame, target_names) -> pd.DataFrame:
     """
     Uses TeamNameResolver to produce stable mapped team names.
     For Understat-internal consistency this still helps normalize aliases.
     """
     out = df.copy()
 
-    # Build resolver from all observed names in this dataset
-    target_names = sorted(set(out["home_team"].dropna().astype(str)).union(
-                          set(out["away_team"].dropna().astype(str))))
     resolver = TeamNameResolver(target_names=target_names, min_fuzzy_score=82)
 
     out["home_team_mapped"] = out["home_team"].apply(lambda x: resolver.resolve(x) if pd.notna(x) else x)
@@ -128,10 +188,11 @@ def add_canonical_team_names(df: pd.DataFrame) -> pd.DataFrame:
 
 def main():
     df = fetch_bundesliga_xg_current_and_previous()
-    df = add_canonical_team_names(df)
+    df = add_canonical_team_names(df, load_main_team_names())
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    out_path = os.path.join(script_dir, "data", "bundesliga_xg_clean.csv")
+    # write Big-5 xG output
+    out_path = os.path.join(script_dir, "data", "big5_xg_clean.csv")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
     df.to_csv(out_path, index=False, encoding="utf-8-sig")
