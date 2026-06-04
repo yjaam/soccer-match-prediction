@@ -1,13 +1,20 @@
-{\rtf1\ansi\ansicpg1252\cocoartf2868
+{\rtf1\ansi\ansicpg1252\cocoartf2870
 \cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 HelveticaNeue;}
 {\colortbl;\red255\green255\blue255;\red25\green25\blue25;}
 {\*\expandedcolortbl;;\cssrgb\c12941\c12941\c12941;}
 \paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
 \pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
 
-\f0\fs24 \cf0 notes masterarbeit\
+\f0\fs24 \cf0 Schritte ab Juni \'8226:\
 \
-datenbasis: big5 ligen, viele jahre wie es geht\
+torh\'fcter ratings fehlen manchmal, untersuchen\
+Dimension reduction, weitere wege testen: Simple position pca (stand jetzt), neue Spielstatistiken nehmen (P\'e4sse, Ballbesitz) und PCA erstellen (BA Niklas), taktische log ratios auf basis der pcas (BA Niklas), \
+\
+\
+\
+\
+notes masterarbeit\
+torh\'c3\'bcter fifa werte fehlen manchmal. untersuchendatenbasis: big5 ligen, viele jahre wie es geht\
 alle features (eg wetter, in-game statistiken)\
 \
 ziel: echtzeitvorhersage, mit explainability (SHAP, variable importance)\
@@ -24,7 +31,7 @@ Wettmarkt analyse: Threshold setzen f\'fcr wett-abschluss, gemessen an Gewinn\
 
 \f1\fs22 \cf2 \expnd0\expndtw0\kerning0
 \ul \ulc2 Datenbasis\ulnone : Top5 Ligen Herren (xG, Fbref-Daten, FIFA-Videospiel-Daten)*, m\'f6glichst viele Jahre*\
-\ul Data-Engineering:\ulnone  Group-PCAs (\'e4hnlich) wie bei Ivo, log-Ratios von diesen PCAs, fehlende Schl\'fcsselspieler Variable, Taktik-PCA (letzten 3 bei Niklas dann nachlesbar, kl\'e4re noch die Weitergabe), F\'c4LLT UNS NOCH WAS EIN? (GGF. LITERATUR*)\
+\ul Data-Engineering:\ulnone  Group-PCAs (\'e4hnlich) wie bei Ivo, log-Ratios von diesen PCAs, fehlende Schl\'fcsselspieler Variable (bayesianisch), Taktik-PCA (letzten 3 bei Niklas dann nachlesbar, kl\'e4re noch die Weitergabe), F\'c4LLT UNS NOCH WAS EIN? (GGF. LITERATUR*)\
 \ul Methodische Grund-Idee\ulnone : neuronales Netz (wegen starker Vorhersage-F\'e4higkeit durch Ber\'fccksichtigung aller Interaktionen) f\'fcr Skellam Verteilung (Tore und Ausgang zusammen modellierbar, Handout im Anhang)\'a0 \'a0(schnell implementierbar?*)\'a0\
 \ul Baselines\ulnone  (geringer Aufwand): Mannschafts-Marktwerte, wenige wichtige Features in linearer Skellam-Regression nutzen\
 \ul Daten-Experimente\ulnone  statt Simulationen: Gewichte zu Spielausgang, Zeit-Handling (Gewichte?), Ligen getrennt trainieren, IDEEN?\
