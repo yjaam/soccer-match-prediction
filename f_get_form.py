@@ -141,7 +141,7 @@ def main():
     df["away_form"] = away_forms
 
     # Remove temporary helpers before writing any pipeline outputs.
-    df_full = df.drop(columns=["home_team_mapped", "away_team_mapped"], errors="ignore").copy()
+    df_full = df
 
     # Save the full forms dataset as the only output of this stage.
     os.makedirs(os.path.dirname(forms_out_path), exist_ok=True)
