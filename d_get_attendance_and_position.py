@@ -2,41 +2,19 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 import unicodedata
+import sys
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+# Add src directory to path for importing the mapping
+sys.path.insert(0, str(SCRIPT_DIR / "src"))
 
 LINEUPS_FILE = SCRIPT_DIR / "data" / "lineups_values_ratings.csv"
 CLUBS_FILE = SCRIPT_DIR / "transfermarkt_data" / "clubs.csv"
 GAMES_FILE = SCRIPT_DIR / "transfermarkt_data" / "games.csv"
 OUTPUT_FILE = SCRIPT_DIR / "data" / "lineups_values_ratings_games.csv"
 
-team_mapping = {
-    'FC Bayern München': 'Bayern Munich',
-    'Hertha BSC': 'Hertha BSC',
-    'Verein für Leibesübungen Wolfsburg': 'Wolfsburg',
-    '1. Fußball- und Sportverein Mainz 05': 'Mainz 05',
-    'Hamburger SV': 'Hamburger SV',
-    'FC Schalke 04': 'Schalke 04',
-    'TSG 1899 Hoffenheim Fußball-Spielbetriebs GmbH': 'Hoffenheim',
-    'Borussia Verein für Leibesübungen 1900 Mönchengladbach': 'Mönchengladbach',
-    'Sport-Club Freiburg': 'Freiburg',
-    '1. Fußball-Club Köln': 'Köln',
-    'Eintracht Frankfurt Fußball AG': 'Eintracht Frankfurt',
-    'Bayer 04 Leverkusen Fußball': 'Bayer Leverkusen',
-    'FC Augsburg 1907': 'Augsburg',
-    'Verein für Bewegungsspiele Stuttgart 1893': 'Stuttgart',
-    'Borussia Dortmund': 'Dortmund',
-    'Sportverein Werder Bremen von 1899': 'Werder Bremen',
-    'Hannover 96': 'Hannover 96',
-    'RasenBallsport Leipzig': 'RB Leipzig',
-    'Fortuna Düsseldorf': 'Düsseldorf',
-    '1.FC Nuremberg': 'Nürnberg',
-    '1. FC Union Berlin': 'Union Berlin',
-    'SC Paderborn 07': 'Paderborn 07',
-    'Arminia Bielefeld': 'Arminia',
-    'Verein für Leibesübungen Bochum 1848 – Fußballgemeinschaft': 'Bochum',
-    'SpVgg Greuther Fürth': 'Greuther Fürth'
-}
+# Import the team name mapping
+from team_name_mapping_FINAL import soccer_teams, resolve_team_name
 
 # Map lineups `Competition` values to transfermarkt `domestic_competition_id`
 COMPETITION_TO_TM_ID = {
@@ -53,18 +31,24 @@ COMPETITION_TO_TM_ID = {
     'ligue1': 'FR1'
 }
 
+
 def strip_accents(text: str) -> str:
+    """Remove accents from text for better matching."""
     if text is None:
         return ''
     s = unicodedata.normalize('NFKD', str(text))
     return ''.join(ch for ch in s if not unicodedata.combining(ch))
 
+
 def comp_to_tm_id(comp: str):
+    """Convert competition name to transfermarkt competition ID."""
     if pd.isna(comp):
         return None
     return COMPETITION_TO_TM_ID.get(str(comp).lower().strip())
 
+
 def assert_exists(path: Path, label: str):
+    """Check if a file exists, raise error with details if not."""
     if not path.exists():
         raise FileNotFoundError(
             f"{label} not found at:\n{path}\n"
@@ -72,62 +56,89 @@ def assert_exists(path: Path, label: str):
             f"CWD:\n{Path.cwd()}"
         )
 
-def safe_contains(series: pd.Series, pattern: str) -> pd.Series:
-    # regex=False avoids regex edge cases in team names
-    return series.astype(str).str.contains(pattern, case=False, na=False, regex=False)
 
-def get_club_id(name, clubs_df, competition=None):
-    if pd.isna(name):
+def get_club_id_from_team_code(team_code: str, clubs_df: pd.DataFrame, competition: str = None) -> int:
+    """
+    Find club_id from a three-letter team code (like 'ARS', 'MUN', 'PSG').
+    
+    Strategy:
+    1. Look up the team code directly in clubs.csv 'club_code' column
+    2. If not found, try to find the full name from the mapping and search clubs
+    3. Fall back to fuzzy matching on club names
+    """
+    if pd.isna(team_code) or not team_code or str(team_code).strip() == '':
         return None
-
-    name_str = str(name).strip()
-    # prefer filtering clubs by domestic competition when available
+    
+    team_code = str(team_code).strip().upper()
+    
+    # Filter clubs by competition if possible
     tm_comp = comp_to_tm_id(competition)
     if tm_comp:
         clubs_subset = clubs_df[clubs_df['domestic_competition_id'] == tm_comp]
-        # if subset empty, fall back to full clubs_df
         if clubs_subset.empty:
             clubs_subset = clubs_df
     else:
         clubs_subset = clubs_df
-
-    # 1) direct mapped lookup (legacy)
-    mapped_name = team_mapping.get(name_str)
-    if mapped_name:
-        mapped_code = mapped_name.lower().replace(' ', '-')
-        match = clubs_subset[
-            safe_contains(clubs_subset['name'], mapped_name) |
-            safe_contains(clubs_subset['club_code'], mapped_code)
-        ]
-        if not match.empty:
-            return match.iloc[0]['club_id']
-
-    # 2) cleaned name lookup
-    clean_name = (
-        name_str
-        .replace('FC ', '')
-        .replace('1. ', '')
-        .replace(' SV', '')
-        .replace(' SC', '')
-        .strip()
-    )
-
-    match = clubs_subset[safe_contains(clubs_subset['name'], clean_name)]
+    
+    # 1. Direct match on club_code (most reliable)
+    match = clubs_subset[clubs_subset['club_code'].str.upper() == team_code]
     if not match.empty:
         return match.iloc[0]['club_id']
-
-    # 3) token fallback (NO list comprehension, avoids your bug completely)
-    parts = clean_name.split()
-    for token in parts:
-        token = token.strip()
-        if len(token) <= 3:
-            continue
-        match = clubs_subset[safe_contains(clubs_subset['name'], token)]
+    
+    # 2. Try to find the full name from the mapping
+    # The mapping goes full_name -> code, so we need to reverse lookup
+    possible_full_names = []
+    for full_name, code in soccer_teams.items():
+        if code.upper() == team_code:
+            possible_full_names.append(full_name)
+    
+    # Try matching full names against clubs
+    for full_name in possible_full_names:
+        # Try exact match first
+        match = clubs_subset[clubs_subset['name'] == full_name]
         if not match.empty:
             return match.iloc[0]['club_id']
-
-    print(f"Warning: Could not find ID for club: {name_str}")
+        
+        # Try contains match
+        clean_name = strip_accents(full_name).lower()
+        for _, club_row in clubs_subset.iterrows():
+            club_name_clean = strip_accents(club_row['name']).lower()
+            if clean_name in club_name_clean or club_name_clean in clean_name:
+                return club_row['club_id']
+    
+    # 3. Try to match by searching club names that contain parts of known full names
+    for full_name in possible_full_names:
+        # Extract key words from full name (words longer than 3 chars)
+        key_words = [w for w in full_name.split() if len(w) > 3 and w.lower() not in ['club', 'football', 'sport', 'verein']]
+        for word in key_words:
+            clean_word = strip_accents(word).lower()
+            for _, club_row in clubs_subset.iterrows():
+                club_name_clean = strip_accents(club_row['name']).lower()
+                if clean_word in club_name_clean:
+                    return club_row['club_id']
+    
+    # 4. Last resort: try matching the team code against parts of club names
+    # This handles cases where the code might appear in the name
+    for _, club_row in clubs_subset.iterrows():
+        club_name_upper = strip_accents(club_row['name']).upper()
+        if team_code in club_name_upper:
+            return club_row['club_id']
+    
+    print(f"Warning: Could not find club_id for team code: {team_code}")
     return None
+
+
+def get_team_code_from_name(team_name: str) -> str:
+    """
+    Get the three-letter team code from a full team name.
+    Uses the resolve_team_name function from the mapping module.
+    """
+    if pd.isna(team_name):
+        return None
+    
+    team_name = str(team_name).strip()
+    return resolve_team_name(team_name)
+
 
 def main():
     print(f"[INFO] SCRIPT_DIR: {SCRIPT_DIR}")
@@ -143,70 +154,134 @@ def main():
     lineups_df = pd.read_csv(LINEUPS_FILE)
     clubs_df = pd.read_csv(CLUBS_FILE)
     games_df = pd.read_csv(GAMES_FILE)
-
+    
+    # Print sample data for debugging
+    print(f"\n[INFO] Lineups shape: {lineups_df.shape}")
+    print(f"[INFO] Clubs shape: {clubs_df.shape}")
+    print(f"[INFO] Games shape: {games_df.shape}")
+    
+    print(f"\n[INFO] Sample of Home Team values in lineups:")
+    print(lineups_df['Home Team'].dropna().unique()[:10])
+    
+    print(f"\n[INFO] Sample of club_code values in clubs:")
+    print(clubs_df['club_code'].dropna().unique()[:10])
+    
+    # Convert dates
     games_df['date'] = pd.to_datetime(games_df['date'], errors='coerce')
     games_df = games_df.sort_values(by='date', ascending=False)
 
-    print("Mapping club IDs (league-aware)...")
-    # apply with access to the Competition column so we can filter clubs by domestic league
-    lineups_df['home_club_id'] = lineups_df.apply(
-        lambda r: get_club_id(r['Home Team'], clubs_df, r.get('Competition') if 'Competition' in r else None),
-        axis=1
-    )
-    lineups_df['away_club_id'] = lineups_df.apply(
-        lambda r: get_club_id(r['Away Team'], clubs_df, r.get('Competition') if 'Competition' in r else None),
-        axis=1
-    )
+    print("\n[INFO] Mapping club IDs from team codes...")
+    # Get unique team codes for progress reporting
+    unique_teams = pd.concat([
+        lineups_df['Home Team'].dropna(),
+        lineups_df['Away Team'].dropna()
+    ]).unique()
+    
+    print(f"[INFO] Unique team codes to map: {len(unique_teams)}")
+    
+    # Map team codes to club IDs
+    team_to_club_id = {}
+    for team_code in unique_teams:
+        club_id = get_club_id_from_team_code(team_code, clubs_df)
+        team_to_club_id[team_code] = club_id
+    
+    # Report mapping statistics
+    mapped_count = sum(1 for v in team_to_club_id.values() if v is not None)
+    unmapped_count = len(team_to_club_id) - mapped_count
+    print(f"[INFO] Successfully mapped: {mapped_count}/{len(team_to_club_id)}")
+    print(f"[INFO] Failed to map: {unmapped_count}")
+    
+    if unmapped_count > 0:
+        print("\n[WARNING] Unmapped team codes:")
+        for code, club_id in team_to_club_id.items():
+            if club_id is None:
+                print(f"  - {code}")
+    
+    # Apply mapping to lineups
+    lineups_df['home_club_id'] = lineups_df['Home Team'].map(team_to_club_id)
+    lineups_df['away_club_id'] = lineups_df['Away Team'].map(team_to_club_id)
 
+    # Extract attendance and positions
+    print("\n[INFO] Extracting attendance and positions...")
     attendances = []
     home_positions = []
     away_positions = []
-
-    print("Extracting attendance and positions...")
-    for _, row in lineups_df.iterrows():
+    
+    skipped_matches = 0
+    
+    for idx, row in lineups_df.iterrows():
         h_id = row['home_club_id']
         a_id = row['away_club_id']
-
-        # last H2H (latest first because sorted descending by date)
+        
+        if pd.isna(h_id) or pd.isna(a_id):
+            attendances.append(np.nan)
+            home_positions.append(np.nan)
+            away_positions.append(np.nan)
+            skipped_matches += 1
+            continue
+        
+        # Find the last match between these two teams
         last_match = games_df[
             ((games_df['home_club_id'] == h_id) & (games_df['away_club_id'] == a_id)) |
             ((games_df['home_club_id'] == a_id) & (games_df['away_club_id'] == h_id))
         ]
-        attendances.append(last_match.iloc[0]['attendance'] if not last_match.empty else np.nan)
-
-        # latest known home-team position
-        home_games = games_df[(games_df['home_club_id'] == h_id) | (games_df['away_club_id'] == h_id)]
+        
+        if not last_match.empty:
+            attendances.append(last_match.iloc[0]['attendance'])
+        else:
+            attendances.append(np.nan)
+        
+        # Latest home team position
+        home_games = games_df[
+            (games_df['home_club_id'] == h_id) | 
+            (games_df['away_club_id'] == h_id)
+        ]
         home_games_with_pos = home_games[
             ((home_games['home_club_id'] == h_id) & home_games['home_club_position'].notna()) |
             ((home_games['away_club_id'] == h_id) & home_games['away_club_position'].notna())
         ]
+        
         if not home_games_with_pos.empty:
             latest_h = home_games_with_pos.iloc[0]
             pos_h = latest_h['home_club_position'] if latest_h['home_club_id'] == h_id else latest_h['away_club_position']
             home_positions.append(pos_h)
         else:
             home_positions.append(np.nan)
-
-        # latest known away-team position
-        away_games = games_df[(games_df['home_club_id'] == a_id) | (games_df['away_club_id'] == a_id)]
+        
+        # Latest away team position
+        away_games = games_df[
+            (games_df['home_club_id'] == a_id) | 
+            (games_df['away_club_id'] == a_id)
+        ]
         away_games_with_pos = away_games[
             ((away_games['home_club_id'] == a_id) & away_games['home_club_position'].notna()) |
             ((away_games['away_club_id'] == a_id) & away_games['away_club_position'].notna())
         ]
+        
         if not away_games_with_pos.empty:
             latest_a = away_games_with_pos.iloc[0]
             pos_a = latest_a['home_club_position'] if latest_a['home_club_id'] == a_id else latest_a['away_club_position']
             away_positions.append(pos_a)
         else:
             away_positions.append(np.nan)
-
+        
+        if (idx + 1) % 1000 == 0:
+            print(f"  Processed {idx + 1}/{len(lineups_df)} matches...")
+    
     lineups_df['attendance'] = attendances
     lineups_df['home_club_position_before_game'] = home_positions
     lineups_df['away_club_position_before_game'] = away_positions
+    
+    print(f"\n[INFO] Matches skipped due to missing club IDs: {skipped_matches}")
+    print(f"[INFO] Attendance found: {sum(1 for a in attendances if pd.notna(a))}")
+    print(f"[INFO] Home positions found: {sum(1 for p in home_positions if pd.notna(p))}")
+    print(f"[INFO] Away positions found: {sum(1 for p in away_positions if pd.notna(p))}")
 
+    # Save results
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
     lineups_df.to_csv(OUTPUT_FILE, index=False, encoding="utf-8-sig")
-    print(f"Done! Saved to: {OUTPUT_FILE}")
+    print(f"\n[SUCCESS] Done! Saved to: {OUTPUT_FILE}")
+
 
 if __name__ == "__main__":
     main()

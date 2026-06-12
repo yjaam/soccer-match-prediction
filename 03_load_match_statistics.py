@@ -150,6 +150,34 @@ def main() -> None:
         if len(failures) > 20:
             print(f" ... and {len(failures) - 20} more")
 
+# ... (existing imports)
+
+# map team names to the three letter codes defined in the soccer_teams dictionary in team_name_mapping_FINAL.py
+from src.team_name_mapping_FINAL import resolve_team_name
 
 if __name__ == "__main__":
     main()
+    
+    # Post-process: Map team names in the saved file
+    print("\nApplying team name mapping to saved data...")
+    out_path = DEFAULT_OUT_DIR / DEFAULT_OUT_FILE
+    df = pd.read_csv(out_path)
+
+    # Check if necessary columns exist (football-data.co.uk uses 'HomeTeam' and 'AwayTeam')
+    if 'HomeTeam' in df.columns and 'AwayTeam' in df.columns:
+        # Apply the resolver
+        df['HomeTeam'] = df['HomeTeam'].apply(lambda x: resolve_team_name(str(x)) if pd.notna(x) else x)
+        df['AwayTeam'] = df['AwayTeam'].apply(lambda x: resolve_team_name(str(x)) if pd.notna(x) else x)
+        
+        # add game id column as defined before (e.g., "20230812_MUN_BAR")
+        # date is currently in the format DD/MM/YYYY or similar, so we need to parse it first
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df['game_id'] = df['Date'].dt.strftime('%Y%m%d') + '_' + df['HomeTeam'] + '_' + df['AwayTeam']
+        
+        # Save back to CSV
+        df.to_csv(out_path, index=False)
+        print(f"[OK] Team names mapped successfully in {out_path}")
+    else:
+        print("[WARN] Columns 'HomeTeam' or 'AwayTeam' not found. Mapping skipped.")
+
+

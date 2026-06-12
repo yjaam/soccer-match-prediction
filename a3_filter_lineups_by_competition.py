@@ -59,10 +59,27 @@ if missing_comps:
 else:
     print(f"\n✓ All target competitions present")
 
+# filter to keep only rows where team names consist of three uppercase letters (e.g., "MUN", "BAR", "PSG") in either Home Team or Away Team columns
+print(f"\nFiltering to rows with three-letter uppercase team codes...")
+filtered_lineups = filtered_lineups[
+    filtered_lineups['Home Team'].str.match(r'^[A-Z]{3}$') |
+    filtered_lineups['Away Team'].str.match(r'^[A-Z]{3}$')
+].copy()
+filtered_count = len(filtered_lineups)
+print(f"Rows after team code filtering: {filtered_count}")
+
 # Sort by date
 print(f"\nSorting by date...")
 filtered_lineups['Date'] = pd.to_datetime(filtered_lineups['Date'])
 filtered_lineups = filtered_lineups.sort_values('Date').reset_index(drop=True)
+
+# add a game_id column by concatenating date, home team, and away team (e.g., "20230812_MUN_BAR")
+# the id column should be the first column
+print(f"\nAdding game_id column...")
+filtered_lineups['game_id'] = filtered_lineups['Date'].dt.strftime('%Y%m%d') + '_' + filtered_lineups['Home Team'] + '_' + filtered_lineups['Away Team']
+cols = filtered_lineups.columns.tolist()
+cols = ['game_id'] + [col for col in cols if col != 'game_id']
+filtered_lineups = filtered_lineups[cols]   
 
 # Save filtered lineups
 print(f"\nSaving filtered lineups to {LINEUPS_FILE}...")

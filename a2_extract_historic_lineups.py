@@ -9,6 +9,12 @@ from pathlib import Path
 import re
 import warnings
 
+# Import the resolver function
+try:
+    from src.team_name_mapping_FINAL import resolve_team_name
+except ModuleNotFoundError:
+    from team_name_mapping_FINAL import resolve_team_name
+
 warnings.filterwarnings('ignore')
 
 # Define paths
@@ -175,6 +181,12 @@ def build_historic_lineups():
     # Create dataframe
     historic_lineups = pd.DataFrame(lineup_rows)
     print(f"\nHistoric lineups shape: {historic_lineups.shape}")
+    
+    # Apply the resolver function to standardise team names
+    if not historic_lineups.empty:
+        historic_lineups['Home Team'] = historic_lineups['Home Team'].apply(resolve_team_name)
+        historic_lineups['Away Team'] = historic_lineups['Away Team'].apply(resolve_team_name)
+        
     print(f"Columns: {list(historic_lineups.columns)[:10]}...")
     
     # Ensure all expected columns exist (fill missing with empty strings)

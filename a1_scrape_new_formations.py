@@ -6,6 +6,15 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 
+# Import the resolver function you saved
+try:
+    # If running from the root directory
+    from src.team_name_mapping_FINAL import resolve_team_name
+except ModuleNotFoundError:
+    # If running directly from inside the src/ directory
+    from team_name_mapping_FINAL import resolve_team_name
+
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
 }
@@ -208,6 +217,10 @@ def main():
     
     # Format and reorder columns
     if not df_scraped.empty:
+        # Apply the resolver function to standardise team names before doing anything else
+        df_scraped['Home Team'] = df_scraped['Home Team'].apply(resolve_team_name)
+        df_scraped['Away Team'] = df_scraped['Away Team'].apply(resolve_team_name)
+
         # Base columns updated to include Competition
         base_cols = ["Competition", "Date", "Home Team", "Away Team"]
         # Fixed reference to df_scraped.columns

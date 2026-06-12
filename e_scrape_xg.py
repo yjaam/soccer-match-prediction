@@ -6,8 +6,11 @@ import pandas as pd
 from datetime import datetime
 from understatapi import UnderstatClient
 
-# Helper in same folder
-from team_name_resolver import TeamNameResolver
+# Import the new resolver function
+try:
+    from src.team_name_mapping_FINAL import resolve_team_name
+except ModuleNotFoundError:
+    from team_name_mapping_FINAL import resolve_team_name
 
 
 def parse_matchday(m):
@@ -169,15 +172,14 @@ def fetch_bundesliga_xg_current_and_previous():
 
 def add_canonical_team_names(df: pd.DataFrame, target_names) -> pd.DataFrame:
     """
-    Uses TeamNameResolver to produce stable mapped team names.
+    Uses resolve_team_name to produce stable mapped team names.
     For Understat-internal consistency this still helps normalize aliases.
     """
     out = df.copy()
 
-    resolver = TeamNameResolver(target_names=target_names, min_fuzzy_score=82)
-
-    out["home_team_mapped"] = out["home_team"].apply(lambda x: resolver.resolve(x) if pd.notna(x) else x)
-    out["away_team_mapped"] = out["away_team"].apply(lambda x: resolver.resolve(x) if pd.notna(x) else x)
+    # Apply our dictionary-based mapping directly to the target columns
+    out["home_team_mapped"] = out["home_team"].apply(lambda x: resolve_team_name(x) if pd.notna(x) else x)
+    out["away_team_mapped"] = out["away_team"].apply(lambda x: resolve_team_name(x) if pd.notna(x) else x)
 
     # Final fallback: if resolver returns None, keep original
     out["home_team_mapped"] = out["home_team_mapped"].fillna(out["home_team"])
