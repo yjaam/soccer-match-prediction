@@ -1,0 +1,169 @@
+team_name,team_code,type
+1. Fußball- und Sportverein Mainz 05,M05,home
+1. Fußball-Club Köln,KOE,home
+1. Fußballclub Heidenheim 1846,HDH,home
+1. Fußballclub Union Berlin,UNB,home
+AC Ajaccio,ACA,home
+AC Carpi,CAR,home
+AC Monza,MON,home
+AS Nancy-Lorraine,NAN,home
+AS Saint-Étienne,STE,home
+Amiens SC,AMI,home
+Angers Sporting Club de l'Ouest,ANG,home
+Arminia Bielefeld,DSC,home
+Arsenal Football Club,ARS,home
+Association Football Club Bournemouth,BOU,home
+Association de la Jeunesse auxerroise,AJA,home
+Association sportive de Monaco Football Club,ASM,home
+Associazione Calcio Fiorentina,FIO,home
+Associazione Calcio Milan,ACM,home
+Associazione Sportiva Roma,ROM,home
+Aston Villa Football Club,AVL,home
+Atalanta Bergamasca Calcio S.p.a.,ATA,home
+Athletic Club Bilbao,ATH,home
+Bayer 04 Leverkusen Fußball,B04,home
+Benevento Calcio,BEN,home
+Bologna Football Club 1909,BOL,home
+Borussia Dortmund,BVB,home
+Borussia Verein für Leibesübungen 1900 Mönchengladbach,BMG,home
+Brentford Football Club,BRE,home
+Brescia Calcio,BRE,home
+Brighton and Hove Albion Football Club,BHA,home
+Burnley Football Club,BUR,home
+CD Leganés,LEG,home
+Cagliari Calcio,CAG,home
+Calcio Como,COM,home
+Cardiff City,CAR,home
+Cesena FC,CES,home
+Chelsea Football Club,CHE,home
+Chievo Verona,CHI,home
+Clermont Foot 63,CLE,home
+Club Atlético Osasuna,OSA,home
+Club Atlético de Madrid S.A.D.,ATM,home
+Crystal Palace Football Club,CRY,home
+Cádiz CF,CAD,home
+Córdoba CF,COR,home
+Delfino Pescara 1936,PES,home
+Deportivo Alavés S. A. D.,ALA,home
+Deportivo de La Coruña,DEP,home
+Dijon FCO,DIJ,home
+EA Guingamp,GUI,home
+ESTAC Troyes,TRO,home
+Eintracht Frankfurt Fußball AG,SGE,home
+Elche Club de Fútbol S.A.D.,ELC,home
+Everton Football Club,EVE,home
+FC Bayern München,FCB,home
+FC Crotone,CRO,home
+FC Empoli,EMP,home
+FC Girondins Bordeaux,BOR,home
+FC Ingolstadt 04,ING,home
+FC Schalke 04,S04,home
+Football Club Internazionale Milano S.p.A.,INT,home
+Football Club Lorient-Bretagne Sud,LOR,home
+Football Club de Metz,MET,home
+Football Club de Nantes,NAN,home
+Fortuna Düsseldorf,F95,home
+Frosinone Calcio,FRO,home
+Fulham Football Club,FUL,home
+Futbol Club Barcelona,FCB,home
+Fußball-Club Augsburg 1907,FCA,home
+Fußball-Club St. Pauli von 1910,STP,home
+Fußballclub Blau-Weiß Linz,BWL,home
+Fußballclub Red Bull Salzburg,RBS,home
+GFC Ajaccio,GFCA,home
+Genoa Cricket and Football Club,GEN,home
+Getafe Club de Fútbol S. A. D. Team Dubai,GET,home
+Girona Fútbol Club S. A. D.,GIR,home
+Granada CF,GCF,home
+Hamburger Sport Verein,HSV,home
+Hannover 96,H96,home
+Holstein Kiel,KSV,home
+Huddersfield Town,HUD,home
+Hull City,HUL,home
+Ipswich Town,IPS,home
+Juventus Football Club,JUV,home
+Le Havre Athletic Club,HAC,home
+Leeds United Association Football Club,LEE,home
+Leicester City,LEI,home
+Levante Unión Deportiva S.A.D.,LEV,home
+Lille Olympique Sporting Club,LOS,home
+Liverpool Football Club,LIV,home
+Luton Town,LUT,home
+Manchester City Football Club,MCI,home
+Manchester United Football Club,MUN,home
+Middlesbrough FC,MID,home
+Montpellier HSC,MHSC,home
+Málaga CF,MAL,home
+Newcastle United Football Club,NEW,home
+Norwich City,NOR,home
+Nottingham Forest Football Club,NFO,home
+Nîmes Olympique,NIM,home
+Olympique Gymnaste Club Nice Côte d'Azur,NIC,home
+Olympique Lyonnais,OL,home
+Olympique de Marseille,OM,home
+Palermo FC,PAL,home
+Paris Football Club,PFC,home
+Paris Saint-Germain Football Club,PSG,home
+Parma Calcio 1913,PAR,home
+Pisa Sporting Club,PIS,home
+Queens Park Rangers,QPR,home
+Racing Club de Lens,RCL,home
+Racing Club de Strasbourg Alsace,RCS,home
+RasenBallsport Leipzig,RBL,home
+Rayo Vallecano de Madrid S. A. D.,RAY,home
+Real Betis Balompié S.A.D.,BET,home
+Real Club Celta de Vigo S. A. D.,CEL,home
+Real Club Deportivo Mallorca S.A.D.,MLL,home
+Real Madrid Club de Fútbol,RMA,home
+Real Oviedo S.A.D.,OVI,home
+Real Sociedad de Fútbol S.A.D.,RSO,home
+Real Valladolid CF,VLD,home
+Reial Club Deportiu Espanyol de Barcelona S.A.D.,ESP,home
+SC Bastia,BAS,home
+SC Paderborn 07,SCP,home
+SD Eibar,EIB,home
+SD Huesca,HUE,home
+SM Caen,CAE,home
+SPAL,SPA,home
+SV Darmstadt 98,D98,home
+Sevilla Fútbol Club S.A.D.,SEV,home
+Sheffield United,SHU,home
+Società Sportiva Calcio Napoli,NAP,home
+Società Sportiva Lazio S.p.A.,LAZ,home
+Southampton FC,SOU,home
+SpVgg Greuther Fürth,SGF,home
+Spezia Calcio,SPE,home
+Sport-Club Freiburg,SCF,home
+Sporting Gijón,GIJ,home
+Sportverein Werder Bremen von 1899,SVW,home
+Stade Reims,REI,home
+Stade Rennais Football Club,REN,home
+Stade brestois 29,SB29,home
+Stoke City,STK,home
+Sunderland Association Football Club,SUN,home
+Swansea City,SWA,home
+Thonon Évian Grand Genève FC,EVI,home
+Torino Calcio,TOR,home
+Tottenham Hotspur Football Club,TOT,home
+Toulouse Football Club,TFC,home
+Turn- und Sportgemeinschaft 1899 Hoffenheim Fußball-Spielbetriebs,TSG,home
+Turn- und Sportverein Egger Glas Hartberg,TSV,home
+UC Sampdoria,SAM,home
+UD Almería,ALM,home
+UD Las Palmas,LPA,home
+US Salernitana 1919,SAL,home
+Udinese Calcio,UDI,home
+Unione Sportiva Cremonese S.p.A.,CRE,home
+Unione Sportiva Lecce,LEC,home
+Unione Sportiva Sassuolo Calcio,SAS,home
+Valencia Club de Fútbol S. A. D.,VAL,home
+Venezia FC,VEN,home
+Verein für Bewegungsspiele Stuttgart 1893,VFB,home
+Verein für Leibesübungen Wolfsburg,WOB,home
+Verona Hellas Football Club,VER,home
+VfL Bochum,BOC,home
+Villarreal Club de Fútbol S.A.D.,VIL,home
+Watford FC,WAT,home
+West Bromwich Albion,WBA,home
+West Ham United Football Club,WHU,home
+Wolverhampton Wanderers Football Club,WOL,home

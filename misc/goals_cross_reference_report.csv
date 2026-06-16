@@ -1,0 +1,10 @@
+Metric,Value
+Total rows before goal filtering,14810
+Rows removed (missing goals),1224
+Final rows,13586
+HG from PCA data,13586
+HG filled from target_variables,0
+HG conflicts between sources,11
+AG from PCA data,13586
+AG filled from target_variables,0
+AG conflicts between sources,5
