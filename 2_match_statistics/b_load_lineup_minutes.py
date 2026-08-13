@@ -4,10 +4,48 @@ import pandas as pd
 import json
 import os
 import re
+import time
 from pathlib import Path
 from datetime import datetime
+from botasaurus import browser
+
+# ============================================================================
+# HEADLESS PATCH (correct instance method version)
+# ============================================================================
+
+def _get_soup_headless(self, url: str) -> BeautifulSoup:
+    """Headless version of _get_soup. Accepts self to work as instance method."""
+    @browser(
+        headless=True,
+        block_images_and_css=True,
+        wait_for_complete_page_load=False,
+        output=None,
+        create_error_logs=False,
+    )
+    def _(driver, url):
+        driver.google_get(url)
+        while True:
+            try:
+                driver.wait_for_element("body.fb", wait=10)
+                break
+            except Exception:
+                driver.reload()
+        return BeautifulSoup(driver.page_html, "html.parser")
+    return _(url)
+
+# Patch as instance method (NOT staticmethod)
+sfc.FBref._get_soup = _get_soup_headless
 
 fb = sfc.FBref()
+print("Headless mode active")
+
+# Verify get_match_links works
+print("Testing get_match_links...")
+try:
+    test_links = fb.get_match_links(year='2024-2025', league='England Premier League')
+    print(f"  ✓ get_match_links works: {len(test_links)} links found")
+except Exception as e:
+    print(f"  ❌ get_match_links broken: {e}")
 
 # ============================================================================
 # CONFIGURATION
@@ -29,16 +67,23 @@ if TEST_MODE:
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
 CHECKPOINT_DIR = PROJECT_DIR / "scraperfc_data" / "checkpoints"
+LINEUPS_JSON_DIR = PROJECT_DIR / "scraperfc_data" / "lineups_json"
 CHECKPOINT_FILE = CHECKPOINT_DIR / "lineup_scraping_checkpoint.json"
 
 if TEST_MODE:
     CHECKPOINT_FILE = CHECKPOINT_DIR / "lineup_scraping_checkpoint_TEST.json"
+    LINEUPS_JSON_DIR = PROJECT_DIR / "scraperfc_data" / "lineups_json_test"
 
 CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+LINEUPS_JSON_DIR.mkdir(parents=True, exist_ok=True)
 
-# Reset test checkpoint
-if TEST_MODE and CHECKPOINT_FILE.exists():
-    CHECKPOINT_FILE.unlink()
+# Final output path
+output_name = "detailed_lineups_TEST.csv" if TEST_MODE else "detailed_lineups.csv"
+OUTPUT_PATH = PROJECT_DIR / "data" / output_name
+os.makedirs(OUTPUT_PATH.parent, exist_ok=True)
+
+# Browser restart settings
+MATCHES_BEFORE_RESTART = 50
 
 # ============================================================================
 # CHECKPOINT FUNCTIONS
@@ -54,6 +99,25 @@ def save_checkpoint(checkpoint_data):
     checkpoint_data["last_updated"] = datetime.now().isoformat()
     with open(CHECKPOINT_FILE, 'w') as f:
         json.dump(checkpoint_data, f, indent=2)
+
+# ============================================================================
+# VALUE CLEANING
+# ============================================================================
+
+def clean_value(val):
+    if val is None:
+        return None
+    val = str(val).strip()
+    if val == '' or val.lower() == 'nan':
+        return None
+    if ',' in val:
+        cleaned = val.replace(',', '')
+        try:
+            float(cleaned)
+            return cleaned
+        except ValueError:
+            pass
+    return val
 
 # ============================================================================
 # EXTRACTION FUNCTION
@@ -76,7 +140,7 @@ def extract_lineups(url: str, league: str, season: str) -> list[dict]:
     home_id = team_ids[0] if len(team_ids) > 0 else None
     away_id = team_ids[1] if len(team_ids) > 1 else None
     
-    # Get team names from match stats section
+    # Get team names
     team_names = {}
     team_stats_tbody = soup.select_one('#team_stats > table > tbody')
     if team_stats_tbody:
@@ -115,10 +179,10 @@ def extract_lineups(url: str, league: str, season: str) -> list[dict]:
             if player_th:
                 player_data['player'] = player_th.get_text(strip=True)
             
-            # Extract stats from td elements
+            # Extract stats
             for td in row.find_all('td'):
                 stat = td.get('data-stat', '')
-                val = td.get_text(strip=True)
+                val = clean_value(td.get_text(strip=True))
                 
                 if stat == 'shirtnumber':
                     player_data['jersey_number'] = val
@@ -140,7 +204,7 @@ def extract_lineups(url: str, league: str, season: str) -> list[dict]:
             if player_data.get('player'):
                 # Determine if starter
                 try:
-                    mins = int(player_data.get('minutes_played', 0))
+                    mins = int(float(player_data.get('minutes_played', 0)))
                 except (ValueError, TypeError):
                     mins = 0
                 player_data['is_starter'] = mins >= 45
@@ -148,6 +212,19 @@ def extract_lineups(url: str, league: str, season: str) -> list[dict]:
                 players.append(player_data)
     
     return players
+
+
+def extract_lineups_with_retry(url, league, season, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            return extract_lineups(url, league, season)
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 30
+                print(f"        Retry {attempt+1}/{max_retries} in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                raise e
 
 
 # ============================================================================
@@ -166,13 +243,14 @@ completed_urls = set(checkpoint["completed_urls"])
 print(f"Already completed: {len(completed_urls)} URLs")
 
 # ============================================================================
-# PHASE 1: Get URLs and scrape lineups
+# PHASE 1: Scrape lineups, save as JSON
 # ============================================================================
 print("\n" + "="*60)
-print("PHASE 1: Getting match URLs and scraping lineups")
+print("PHASE 1: Scraping lineups (saving as JSON files)")
 print("="*60)
 
-all_players = []
+total_scraped = 0
+matches_since_restart = 0
 
 for league in big_5_leagues:
     for season in seasons:
@@ -187,73 +265,128 @@ for league in big_5_leagues:
                 print(f"  TEST MODE: Limited to {len(links)} matches")
             
             for i, url in enumerate(links):
-                if url in completed_urls:
-                    print(f"    [{i+1}/{len(links)}] Skip: {url.split('/')[-1][:60]}")
+                match_id = url.split('/')[-2]
+                json_path = LINEUPS_JSON_DIR / f"{match_id}.json"
+                
+                # Skip if JSON already exists
+                if json_path.exists():
                     continue
                 
-                print(f"    [{i+1}/{len(links)}] Scraping: {url.split('/')[-1][:60]}...")
+                # Restart browser periodically
+                if matches_since_restart >= MATCHES_BEFORE_RESTART:
+                    print("    🔄 Restarting browser...")
+                    try:
+                        fb_new = sfc.FBref()
+                        fb = fb_new
+                        # Re-patch _get_soup after re-initialization
+                        sfc.FBref._get_soup = _get_soup_headless
+                    except:
+                        pass
+                    matches_since_restart = 0
+                    time.sleep(5)
                 
-                try:
-                    players = extract_lineups(url, league, season)
-                    all_players.extend(players)
-                    
-                    checkpoint["completed_urls"].append(url)
-                    save_checkpoint(checkpoint)
-                    
-                except Exception as e:
-                    print(f"      ❌ Error: {e}")
-                    checkpoint["failed_urls"].append(url)
-                    save_checkpoint(checkpoint)
+                print(f"    [{i+1}/{len(links)}] {match_id}: {url.split('/')[-1][:50]}...")
+                
+                success = False
+                for attempt in range(3):
+                    try:
+                        players = extract_lineups(url, league, season)
+                        
+                        # Save as JSON (one file per match, containing list of players)
+                        with open(json_path, 'w', encoding='utf-8') as f:
+                            json.dump(players, f, ensure_ascii=False)
+                        
+                        checkpoint["completed_urls"].append(url)
+                        save_checkpoint(checkpoint)
+                        
+                        total_scraped += 1
+                        matches_since_restart += 1
+                        success = True
+                        break
+                        
+                    except Exception as e:
+                        if attempt < 2:
+                            wait_time = (attempt + 1) * 30
+                            print(f"      Retry {attempt+1}/3 in {wait_time}s...")
+                            time.sleep(wait_time)
+                        else:
+                            print(f"      ❌ Failed: {str(e)[:80]}")
+                            checkpoint["failed_urls"].append(url)
+                            save_checkpoint(checkpoint)
+                
+                if not success:
+                    try:
+                        fb_new = sfc.FBref()
+                        fb = fb_new
+                        sfc.FBref._get_soup = _get_soup_headless
+                    except:
+                        pass
+                    matches_since_restart = 0
+                    time.sleep(10)
                     
         except Exception as e:
             print(f"  ❌ Error getting links: {e}")
 
 # ============================================================================
-# PHASE 2: Combine with existing data and save
+# PHASE 2: Combine all JSON files into one DataFrame
 # ============================================================================
 print("\n" + "="*60)
-print("PHASE 2: Saving results")
+print("PHASE 2: Combining all JSON files into CSV")
 print("="*60)
 
-output_name = "lineups_TEST.csv" if TEST_MODE else "lineups.csv"
-output_path = PROJECT_DIR / "data" / output_name
-os.makedirs(output_path.parent, exist_ok=True)
+json_files = sorted(LINEUPS_JSON_DIR.glob("*.json"))
+print(f"Found {len(json_files)} JSON files")
 
-if all_players:
-    df_new = pd.DataFrame(all_players)
-    print(f"Newly scraped player entries: {len(df_new)}")
+if json_files:
+    # Load all JSONs - each contains a list of players
+    all_players = []
+    for jf in json_files:
+        try:
+            with open(jf, 'r', encoding='utf-8') as f:
+                players = json.load(f)
+                all_players.extend(players)
+        except Exception as e:
+            print(f"  ⚠ Error loading {jf.name}: {e}")
     
-    # Load existing data if available
-    if output_path.exists():
-        print(f"Loading existing data from {output_path}...")
-        df_existing = pd.read_csv(output_path)
-        print(f"Existing player entries: {len(df_existing)}")
+    # Create DataFrame - proper column alignment by name
+    df_new = pd.DataFrame(all_players)
+    print(f"Combined: {len(df_new)} player entries, {len(df_new.columns)} columns")
+    
+    # Convert numeric columns
+    numeric_cols = ['jersey_number', 'minutes_played', 'goals', 'assists', 
+                    'cards_yellow', 'cards_red']
+    for col in numeric_cols:
+        if col in df_new.columns:
+            df_new[col] = pd.to_numeric(df_new[col], errors='coerce')
+    
+    # Load existing CSV if available and merge
+    if OUTPUT_PATH.exists():
+        print(f"Loading existing data from {OUTPUT_PATH}...")
+        df_existing = pd.read_csv(OUTPUT_PATH, low_memory=False)
+        print(f"Existing: {len(df_existing)} player entries")
         
-        # Combine, dropping duplicates by game_id + team_id + player
+        # Combine, deduplicate
         df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-        before_dedup = len(df_combined)
+        before = len(df_combined)
         df_combined = df_combined.drop_duplicates(
             subset=['game_id', 'team_id', 'player'], 
             keep='last'
         )
-        after_dedup = len(df_combined)
-        
-        if before_dedup != after_dedup:
-            print(f"Removed {before_dedup - after_dedup} duplicate entries")
+        after = len(df_combined)
+        print(f"Combined: {after} entries (removed {before - after} dupes)")
     else:
-        print(f"No existing file found, creating new one.")
         df_combined = df_new
     
-    # Save combined data
-    df_combined.to_csv(output_path, index=False)
+    # Save
+    df_combined.to_csv(OUTPUT_PATH, index=False)
     
     print(f"\n{'='*60}")
     print(f"RESULTS")
     print(f"{'='*60}")
-    print(f"New entries this run: {len(df_new)}")
-    print(f"Total entries in file: {len(df_combined)}")
+    print(f"New matches scraped: {total_scraped}")
+    print(f"Total player entries: {len(df_combined)}")
     print(f"Columns: {list(df_combined.columns)}")
-    print(f"Saved: {output_path}")
+    print(f"Saved: {OUTPUT_PATH}")
     
     print(f"\nSample entries (first 10):")
     display_cols = ['league', 'season', 'game_id', 'side', 'team', 'player', 
@@ -270,7 +403,7 @@ if all_players:
         print(summary.to_string())
     
 else:
-    print("\n⚠ No lineups were scraped!")
-    if output_path.exists():
-        df_existing = pd.read_csv(output_path)
-        print(f"Existing file has {len(df_existing)} entries - nothing to add.")
+    print("\n⚠ No JSON files found!")
+    if OUTPUT_PATH.exists():
+        df_existing = pd.read_csv(OUTPUT_PATH, low_memory=False)
+        print(f"Existing file has {len(df_existing)} entries.")
