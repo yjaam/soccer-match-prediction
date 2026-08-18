@@ -1,0 +1,13 @@
+{
+  "best_test_goal_nll": 2.9652139544487,
+  "best_epoch": 34,
+  "epochs_trained": 40,
+  "batch_size": 512,
+  "learning_rate": 0.0005,
+  "weight_decay": 0.0001,
+  "attention_heads": 2,
+  "dropout": 0.1,
+  "seed": 42,
+  "architecture": "attention_deep_sets",
+  "trained": true
+}

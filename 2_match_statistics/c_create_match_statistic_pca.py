@@ -210,6 +210,12 @@ def main() -> None:
 
 	if "match_id" not in df.columns:
 		raise KeyError("match_id column is required.")
+	if "game_id" not in df.columns:
+		raise KeyError("game_id column is required. Run 2_match_statistics/b_id_matches.py first.")
+
+	rows_before_id_filter = len(df)
+	df = df.dropna(subset=["game_id"]).copy()
+	print(f"Dropped {rows_before_id_filter - len(df)} rows without game_id.")
 	if "Home_goals" not in df.columns or "Away_goals" not in df.columns:
 		raise KeyError("Home_goals and Away_goals are required target columns.")
 
@@ -270,6 +276,7 @@ def main() -> None:
 	train_output_df = pd.concat(
 		[
 			train_df[["match_id"]].reset_index(drop=True),
+			train_df[["game_id"]].reset_index(drop=True),
 			train_df[["Home_goals"]].rename(columns={"Home_goals": "HG"}).reset_index(drop=True),
 			train_df[["Away_goals"]].rename(columns={"Away_goals": "AG"}).reset_index(drop=True),
 			train_pca_frame,
@@ -279,6 +286,7 @@ def main() -> None:
 	test_output_df = pd.concat(
 		[
 			test_df[["match_id"]].reset_index(drop=True),
+			test_df[["game_id"]].reset_index(drop=True),
 			test_df[["Home_goals"]].rename(columns={"Home_goals": "HG"}).reset_index(drop=True),
 			test_df[["Away_goals"]].rename(columns={"Away_goals": "AG"}).reset_index(drop=True),
 			test_pca_frame,
