@@ -58,10 +58,10 @@
       ],
       "train_file": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/final_data/nn_input_player_stats_TRAIN.csv",
       "test_file": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/final_data/nn_input_player_stats_TEST.csv",
-      "rows_train_before": 12524,
-      "rows_test_before": 1062,
-      "rows_train_after": 12524,
-      "rows_test_after": 1062,
+      "rows_train_before": 20775,
+      "rows_test_before": 1612,
+      "rows_train_after": 20775,
+      "rows_test_after": 1612,
       "feature_count": 8
     },
     "skill_matchups": {
@@ -130,7 +130,8 @@
         "PC37",
         "PC38",
         "PC39",
-        "PC40"
+        "PC40",
+        "PC41"
       ],
       "train_file": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/final_data/nn_input_match_stats_TRAIN.csv",
       "test_file": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/final_data/nn_input_match_stats_TEST.csv",
@@ -138,7 +139,7 @@
       "rows_test_before": 1716,
       "rows_train_after": 19462,
       "rows_test_after": 1716,
-      "feature_count": 40
+      "feature_count": 41
     }
   }
 }

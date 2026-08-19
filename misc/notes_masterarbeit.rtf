@@ -1,11 +1,70 @@
 {\rtf1\ansi\ansicpg1252\cocoartf2870
-\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 HelveticaNeue;}
-{\colortbl;\red255\green255\blue255;\red25\green25\blue25;}
-{\*\expandedcolortbl;;\cssrgb\c12941\c12941\c12941;}
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 Menlo-Regular;\f2\fnil\fcharset0 HelveticaNeue;
+}
+{\colortbl;\red255\green255\blue255;\red247\green249\blue250;\red21\green21\blue21;\red25\green25\blue25;
+}
+{\*\expandedcolortbl;;\cssrgb\c97647\c98039\c98431;\cssrgb\c10588\c10588\c10980;\cssrgb\c12941\c12941\c12941;
+}
 \paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
 \pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
 
-\f0\fs24 \cf0 Schritte ab Juni \'8226:\
+\f0\fs24 \cf0 \
+Notizen 19. Aug:\
+\
+Multimodales neuronales Netz mit 4 modulen aus 4 datenquellen\
+\
+Modul 1: Player Ratings\
+	Datenquellen: FIFA Scores + Marktwerte (Transfermarkt)\
+	Missing Values: LOCF Imputation (Annahme stabiler Werte im Zeitverlauf)\
+	PCA\
+	Signal: Spielerst\'e4rke pro Team\
+\
+Modul 2: Skill Matchups\
+	Datenquellen: FIFA Scores \
+	Missing Values: LOCF Imputation (Begegnungsspezifisch)\
+	Log-Ratios der Scores f\'fcr Positionen zwischen Home und Away Team\
+	Signal: Relative St\'e4rke der Teams pro Position\
+\
+Modul 3: Match Statistics\
+	Datenquellen: Fbref Statistiken, gescraped mit ScraperFC Paket\
+	Missing Values: Mean Imputation (Teamspezifisch)\
+	PCA\
+	Signal: Repr\'e4sentation historischer Teamleistungen\
+\
+Modul 4: Lineup Embedding mit Attention Layer\
+	Lineups von Transfermarkt\
+	Embedding mit Deep Sets\
+	-> jeder Spieler als Vektor dargestellt (wie W\'f6rter bei NLP)\
+	-> Vektor kodiert Spieler und seine Position\
+	-> Beziehungen der Spiele untereinander und Wichtigkeit durch Self-Attention kodiert\
+\
+\
+Vorhersage: Multimodales Neuronales Netz, modellierung von Parametern der Skellam Verteilung\
+Output layer: 2 heads (sigmoid activation)\
+\
+Input					MLP						Output\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs26 \cf2 \cb3 \expnd0\expndtw0\kerning0
+Lineup (32) \uc0\u9472 \u9472 \u8594  [LineupSkellamNet] \u9472 \u9472 \u8594  \u955 h\u8321 , \u955 a\u8321 \
+Player (8)  \uc0\u9472 \u9472 \u8594  [PlayerStatsSkellamNet] \u9472 \u9472 \u8594  \u955 h\u8322 , \u955 a\u8322 \
+Skill (12)  \uc0\u9472 \u9472 \u8594  [SkillMatchupsSkellamNet] \u9472 \u9472 \u8594  \u955 h\u8323 , \u955 a\u8323 \
+Match (N)   \uc0\u9472 \u9472 \u8594  [MatchStatsSkellamNet] \u9472 \u9472 \u8594  \u955 h\u8324 , \u955 a\u8324 
+\f0\fs24 \cf0 \cb1 \kerning1\expnd0\expndtw0 \
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+\cf0 	\
+ReLU activation functions, Tanh activation f\'fcr Spieler PCAs\
+Dropout Layers (gegen overfitting + bessere generalisierung + flexibilisierung (ensemble))\
+Flexible learning rate f\'fcr jedes Netz\
+\
+\
+\
+\
+\
+\
+\
+\
+Schritte ab Juni \'8226:\
 \
 torh\'fcter ratings fehlen manchmal, untersuchen\
 Dimension reduction, weitere wege testen: Simple position pca (stand jetzt), neue Spielstatistiken nehmen (P\'e4sse, Ballbesitz) und PCA erstellen (BA Niklas), taktische log ratios auf basis der pcas (BA Niklas), \
@@ -29,8 +88,8 @@ Wettmarkt analyse: Threshold setzen f\'fcr wett-abschluss, gemessen an Gewinn\
 ############\
 \pard\pardeftab720\sa300\partightenfactor0
 
-\f1\fs22 \cf2 \expnd0\expndtw0\kerning0
-\ul \ulc2 Datenbasis\ulnone : Top5 Ligen Herren (xG, Fbref-Daten, FIFA-Videospiel-Daten)*, m\'f6glichst viele Jahre*\
+\f2\fs22 \cf4 \expnd0\expndtw0\kerning0
+\ul \ulc4 Datenbasis\ulnone : Top5 Ligen Herren (xG, Fbref-Daten, FIFA-Videospiel-Daten)*, m\'f6glichst viele Jahre*\
 \ul Data-Engineering:\ulnone  Group-PCAs (\'e4hnlich) wie bei Ivo, log-Ratios von diesen PCAs, fehlende Schl\'fcsselspieler Variable (bayesianisch), Taktik-PCA (letzten 3 bei Niklas dann nachlesbar, kl\'e4re noch die Weitergabe), F\'c4LLT UNS NOCH WAS EIN? (GGF. LITERATUR*)\
 \ul Methodische Grund-Idee\ulnone : neuronales Netz (wegen starker Vorhersage-F\'e4higkeit durch Ber\'fccksichtigung aller Interaktionen) f\'fcr Skellam Verteilung (Tore und Ausgang zusammen modellierbar, Handout im Anhang)\'a0 \'a0(schnell implementierbar?*)\'a0\
 \ul Baselines\ulnone  (geringer Aufwand): Mannschafts-Marktwerte, wenige wichtige Features in linearer Skellam-Regression nutzen\

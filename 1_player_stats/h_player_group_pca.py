@@ -22,7 +22,7 @@ import pandas as pd
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
-INPUT_PATH = PROJECT_DIR / "data" / "data_before_pca.csv"
+INPUT_PATH = PROJECT_DIR / "data" / "player_group_before_pca.csv"
 TARGET_VARS_PATH = PROJECT_DIR / "data" / "target_variables.csv"
 FINAL_DATA_DIR = PROJECT_DIR / "final_data"
 TRAIN_OUTPUT_PATH = FINAL_DATA_DIR / "player_statistics_pca_TRAIN.csv"
@@ -135,10 +135,14 @@ def resolve_team_columns(frame: pd.DataFrame) -> dict[str, str]:
 
 
 def split_train_test(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    if "season_start_year" not in frame.columns:
-        raise KeyError("season_start_year column is required for the train/test split.")
+    if "season_start_year" in frame.columns:
+        season_year = pd.to_numeric(frame["season_start_year"], errors="coerce")
+    else:
+        date_col = resolve_date_column(frame)
+        dt = pd.to_datetime(frame[date_col], errors="coerce")
+        season_year = np.where(dt.dt.month >= 7, dt.dt.year, dt.dt.year - 1)
+        season_year = pd.Series(season_year, index=frame.index, dtype="float64")
 
-    season_year = pd.to_numeric(frame["season_start_year"], errors="coerce")
     train_df = frame[season_year < 2025].copy()
     test_df = frame[season_year == 2025].copy()
 
@@ -221,7 +225,7 @@ def locf_impute(
     report_rows = []
 
     for column in feature_columns:
-        side = "home" if column.startswith("Home_") else "away"
+        side = "home" if column.startswith("Home") else "away"
         team_column = team_columns[side]
 
         imputed[column] = pd.to_numeric(imputed[column], errors="coerce")

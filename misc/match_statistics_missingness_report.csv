@@ -63,4 +63,5 @@ Away_keeper_gk_shots_on_target_against,99,0,away_team,True
 Away_keeper_gk_goals_against,35,0,away_team,True
 Away_keeper_gk_saves,1187,0,away_team,True
 Away_keeper_gk_save_pct,417,0,away_team,True
-game_id,19474,19474,away_team,False
+home_xg,174,0,home_team,True
+away_xg,174,0,away_team,True

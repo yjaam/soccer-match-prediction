@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import os
+import re
 import sys
+import unicodedata
 import pandas as pd
 from datetime import datetime
 from understatapi import UnderstatClient
@@ -15,7 +17,61 @@ if project_dir not in sys.path:
     sys.path.insert(0, project_dir)
 
 # Now import from src
-from src.team_name_mapping_FINAL import resolve_team_name
+from src.team_name_mapping_FINAL import resolve_team_name_fuzzy, soccer_teams
+
+
+NON_ALNUM_PATTERN = re.compile(r"[^a-z0-9]+")
+
+LOCAL_ALIASES = {
+    "Manchester Utd": "MUN",
+    "PSG": "PSG",
+    "Frankfurt": "SGE",
+    "Gladbach": "BMG",
+    "Hellas Verona": "VER",
+    "Hertha BSC": "BSC",
+    "Nottingham": "NFO",
+    "Atlético Madrid": "ATM",
+    "Köln": "KOE",
+    "Alavés": "ALA",
+    "Saint-Étienne": "STE",
+    "Rayo Vallecano": "RAY",
+    "Dep. La Coruña": "DEP",
+    "Málaga": "MAL",
+    "Cádiz": "CAD",
+    "Almería": "ALM",
+    "Nîmes": "NIM",
+    "Leganés": "LEG",
+    "Darmstadt 98": "D98",
+}
+
+
+def normalize_name(name: str) -> str:
+    text = unicodedata.normalize("NFKD", name)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.lower().strip()
+    text = NON_ALNUM_PATTERN.sub(" ", text)
+    return " ".join(text.split())
+
+
+NORMALIZED_LOOKUP = {}
+for team_name, code in soccer_teams.items():
+    NORMALIZED_LOOKUP.setdefault(normalize_name(str(team_name)), code)
+
+
+def resolve_team_code(name_value: str):
+    if pd.isna(name_value):
+        return None
+
+    name_text = str(name_value).strip()
+    code = resolve_team_name_fuzzy(name_text)
+    if code:
+        return code
+
+    alias_code = LOCAL_ALIASES.get(name_text)
+    if alias_code:
+        return alias_code
+
+    return NORMALIZED_LOOKUP.get(normalize_name(name_text))
 
 
 def parse_matchday(m):
@@ -182,13 +238,22 @@ def add_canonical_team_names(df: pd.DataFrame, target_names) -> pd.DataFrame:
     """
     out = df.copy()
 
-    # Apply our dictionary-based mapping directly to the target columns
-    out["home_team_mapped"] = out["home_team"].apply(lambda x: resolve_team_name(x) if pd.notna(x) else x)
-    out["away_team_mapped"] = out["away_team"].apply(lambda x: resolve_team_name(x) if pd.notna(x) else x)
+    # Resolve to stable team codes used across the rest of the project.
+    out["home_team_mapped"] = out["home_team"].apply(resolve_team_code)
+    out["away_team_mapped"] = out["away_team"].apply(resolve_team_code)
 
-    # Final fallback: if resolver returns None, keep original
+    # Final fallback: if unresolved, keep original text for diagnostics.
     out["home_team_mapped"] = out["home_team_mapped"].fillna(out["home_team"])
     out["away_team_mapped"] = out["away_team_mapped"].fillna(out["away_team"])
+
+    date_token = pd.to_datetime(out["date"], errors="coerce").dt.strftime("%Y%m%d")
+    out["game_id"] = date_token + "_" + out["home_team_mapped"].astype(str) + "_" + out["away_team_mapped"].astype(str)
+    out.loc[
+        pd.to_datetime(out["date"], errors="coerce").isna()
+        | out["home_team_mapped"].isna()
+        | out["away_team_mapped"].isna(),
+        "game_id",
+    ] = pd.NA
 
     return out
 

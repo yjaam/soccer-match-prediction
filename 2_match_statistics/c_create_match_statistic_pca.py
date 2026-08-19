@@ -50,6 +50,15 @@ def is_feature_column(column_name: str) -> bool:
 	return not any(token in lowered for token in EXCLUDE_SUBSTRINGS)
 
 
+def infer_team_group_column(feature_name: str) -> str:
+	lowered = feature_name.lower()
+	if lowered.startswith("home_"):
+		return "home_team"
+	if lowered.startswith("away_"):
+		return "away_team"
+	return "away_team"
+
+
 def team_mean_impute(frame: pd.DataFrame, feature_columns: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
 	"""Impute missing values with the mean of the respective team.
 
@@ -61,7 +70,7 @@ def team_mean_impute(frame: pd.DataFrame, feature_columns: list[str]) -> tuple[p
 	missing_report = []
 
 	for column in feature_columns:
-		team_column = "home_team" if column.startswith("Home_") else "away_team"
+		team_column = infer_team_group_column(column)
 		imputed[column] = pd.to_numeric(imputed[column], errors="coerce")
 
 		missing_before = int(imputed[column].isna().sum())
@@ -100,7 +109,7 @@ def team_mean_impute_with_reference(
 	missing_report = []
 
 	for column in feature_columns:
-		team_column = "home_team" if column.startswith("Home_") else "away_team"
+		team_column = infer_team_group_column(column)
 		imputed[column] = pd.to_numeric(imputed[column], errors="coerce")
 
 		missing_before = int(imputed[column].isna().sum())
@@ -220,7 +229,11 @@ def main() -> None:
 		raise KeyError("Home_goals and Away_goals are required target columns.")
 
 	feature_columns = [column for column in df.columns if is_feature_column(column)]
-	feature_columns = [column for column in feature_columns if column not in {"league", "season", "url", "match_id", "home_team", "away_team"}]
+	feature_columns = [
+		column
+		for column in feature_columns
+		if column not in {"league", "season", "url", "match_id", "game_id", "home_team", "away_team"}
+	]
 
 	if not feature_columns:
 		raise ValueError("No usable numeric match-stat columns were found.")
