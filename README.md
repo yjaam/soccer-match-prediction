@@ -1,8 +1,8 @@
-# Soccer Match Prediction
+# Soccer Match Prediction using Multimodal Neural Networks
 
 ## Getting Started
 
-Use the project runner to build the data needed for the neural-network pipeline from the repository root:
+To scrape the project data, run:
 
 ```bash
 ./.venv/bin/python run_data_pipeline.py module1
@@ -12,12 +12,10 @@ Use the project runner to build the data needed for the neural-network pipeline 
 
 Choose the module you need:
 
-- `module1` for player-statistics and lineup data
-- `module2` for match-statistics data
+- `module1` for player-statistics and lineup data (needs one-time internet connection)
+- `module2` for match-statistics data (needs permanent internet connection)
 - `module3` for lineup embeddings
 
 The scripts write their outputs into the existing data folders inside the repo.
 
-## Next
 
-More project notes can be added here later.
