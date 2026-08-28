@@ -81,6 +81,12 @@ cols = filtered_lineups.columns.tolist()
 cols = ['game_id'] + [col for col in cols if col != 'game_id']
 filtered_lineups = filtered_lineups[cols]   
 
+# ensure that the game_id column is unique and remove any duplicate rows based on game_id
+print(f"\nRemoving duplicate game_id rows...")
+filtered_lineups = filtered_lineups.drop_duplicates(subset=['game_id'], keep='first')
+filtered_count = len(filtered_lineups)
+print(f"Rows after removing duplicates: {filtered_count}")
+
 # Save filtered lineups
 print(f"\nSaving filtered lineups to {LINEUPS_FILE}...")
 filtered_lineups.to_csv(LINEUPS_FILE, index=False)

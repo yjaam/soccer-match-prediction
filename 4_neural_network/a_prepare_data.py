@@ -7,6 +7,10 @@ Outputs:
 - final_data/nn_input_lineup_TRAIN.csv, final_data/nn_input_lineup_TEST.csv
 - final_data/nn_input_player_stats_TRAIN.csv, final_data/nn_input_player_stats_TEST.csv
 - final_data/nn_input_skill_matchups_TRAIN.csv, final_data/nn_input_skill_matchups_TEST.csv
+- final_data/nn_input_match_stats_TRAIN.csv, final_data/nn_input_match_stats_TEST.csv
+- final_data/nn_input_league_TRAIN.csv, final_data/nn_input_league_TEST.csv
+- final_data/nn_input_season_TRAIN.csv, final_data/nn_input_season_TEST.csv
+- final_data/nn_input_matchup_TRAIN.csv, final_data/nn_input_matchup_TEST.csv
 - misc/nn_module_metadata.json
 """
 
@@ -52,6 +56,27 @@ MODULE_SPECS = {
     "match_stats": {
         "train": FINAL_DATA_DIR / "match_statistics_pca_TRAIN.csv",
         "test": FINAL_DATA_DIR / "match_statistics_pca_TEST.csv",
+        "key": "game_id",
+        "label_source": None,
+        "label_key": None,
+    },
+    "league": {
+        "train": FINAL_DATA_DIR / "league_embeddings_TRAIN.csv",
+        "test": FINAL_DATA_DIR / "league_embeddings_TEST.csv",
+        "key": "game_id",
+        "label_source": None,
+        "label_key": None,
+    },
+    "season": {
+        "train": FINAL_DATA_DIR / "season_embeddings_TRAIN.csv",
+        "test": FINAL_DATA_DIR / "season_embeddings_TEST.csv",
+        "key": "game_id",
+        "label_source": None,
+        "label_key": None,
+    },
+    "matchup": {
+        "train": FINAL_DATA_DIR / "matchup_embeddings_TRAIN.csv",
+        "test": FINAL_DATA_DIR / "matchup_embeddings_TEST.csv",
         "key": "game_id",
         "label_source": None,
         "label_key": None,
@@ -126,13 +151,13 @@ def _clean_module(
 
     feature_candidates = [c for c in train.columns if c not in {key_col, "HG", "AG"}]
 
-    # Prevent identifier leakage/corruption from entering model features.
+    # Prevent identifier leakage
     id_like_cols = {
-        c
-        for c in feature_candidates
+        c for c in feature_candidates
         if c == "match_id" or c.endswith("_id") or c.endswith("Id") or c.endswith("ID")
     }
     feature_candidates = [c for c in feature_candidates if c not in id_like_cols]
+    
     feature_cols = []
     for col in feature_candidates:
         train[col] = pd.to_numeric(train[col], errors="coerce")
@@ -176,11 +201,18 @@ def main() -> None:
     print("=" * 70)
     print("PREPARING PER-MODULE INPUTS")
     print("=" * 70)
+    print(f"Modules: {list(MODULE_SPECS.keys())}")
 
     meta = {"modules": {}}
 
     for module_name, spec in MODULE_SPECS.items():
         key_col = spec["key"]
+        
+        # Check if files exist before trying to load
+        if not spec["train"].exists() or not spec["test"].exists():
+            print(f"[{module_name}] ⚠ Missing files, skipping...")
+            continue
+        
         train_raw = _load_frame(spec["train"])
         test_raw = _load_frame(spec["test"])
 
@@ -208,11 +240,13 @@ def main() -> None:
             **stats,
         }
 
-        print(f"[{module_name}] TRAIN shape: {train_clean.shape} | TEST shape: {test_clean.shape}")
+        print(f"[{module_name}] TRAIN: {train_clean.shape} | TEST: {test_clean.shape} | "
+              f"Features: {len(feature_cols)}")
         print(f"[{module_name}] Saved: {train_out.name}, {test_out.name}")
 
     META_OUTPUT_PATH.write_text(json.dumps(meta, indent=2), encoding="utf-8")
-    print(f"Saved module metadata to {META_OUTPUT_PATH}")
+    print(f"\nSaved module metadata to {META_OUTPUT_PATH}")
+    print(f"Total modules prepared: {len(meta['modules'])}")
 
 
 if __name__ == "__main__":

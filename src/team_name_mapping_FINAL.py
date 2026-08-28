@@ -427,6 +427,57 @@ soccer_teams = {
     'Real Oviedo': 'OVI',
     'Pisa': 'PIS',
     'Paris FC': 'PFC',
+
+    # ============================================================================
+    # FOURTH LIST - Additional variants from match statistics and lineup feeds
+    # ============================================================================
+    'PSG': 'PSG',
+    'Manchester Utd': 'MUN',
+    'Leeds United': 'LEE',
+    'Nottingham': 'NFO',
+    'Frankfurt': 'SGE',
+    'Gladbach': 'BMG',
+    'Hertha BSC': 'BSC',
+    'Arminia': 'DSC',
+    'Greuther Fürth': 'SGF',
+    'Darmstadt 98': 'D98',
+    'Paderborn 07': 'SCP',
+    'Köln': 'KOE',
+    'Düsseldorf': 'F95',
+    'Nürnberg': 'FCN',
+    'Hellas Verona': 'VER',
+    'Nîmes': 'NIM',
+    'Saint-Étienne': 'STE',
+    'Evian': 'EVI',
+    'Gazélec Ajaccio': 'GFCA',
+    'Alavés': 'ALA',
+    'Almería': 'ALM',
+    'Málaga': 'MAL',
+    'Cádiz': 'CAD',
+    'Córdoba': 'COR',
+    'Leganés': 'LEG',
+    'Dep. La Coruña': 'DEP',
+    'Rayo Vallecano': 'RAY',
+    'Atlético Madrid': 'ATM',
+    'Elversberg': 'ELV',
+    'Karlsruher': 'KSC',
+    'BTSV': 'BTS',
+    '1. FC Köln': 'KOE',
+    '1899 Hoffenheim': 'TSG',
+    'FSV Mainz 05': 'M05',
+    'Mönchengladbach': 'BMG',
+    'SV 07 Elversberg': 'ELV',
+    'Athletic': 'ATH',
+    'Deportivo': 'DEP',
+    'Racing Santander': 'RSA',
+    'AJ Auxerre': 'AJA',
+    'Le Mans': 'LEM',
+    'Paris Saint-Germain': 'PSG',
+    'AFC Bournemouth': 'BOU',
+    'Brighton & Hove Albion': 'BHA',
+    'Coventry City': 'COV',
+    'Tottenham Hotspur': 'TOT',
+    'Inter Milan': 'INT',
 }
 
 
@@ -438,6 +489,13 @@ def resolve_team_name(name):
     if pd.isna(name):
         return None
     name_str = str(name).strip()
+
+    # If the input is already a known team code (common in lineup feeds),
+    # return it directly.
+    code_upper = name_str.upper()
+    if code_upper in soccer_teams.values():
+        return code_upper
+
     return soccer_teams.get(name_str)
 
 
@@ -452,6 +510,11 @@ def resolve_team_name_fuzzy(name):
         return None
     
     name_str = str(name).strip()
+
+    # Fast-path for already standardized team codes.
+    code_upper = name_str.upper()
+    if code_upper in soccer_teams.values():
+        return code_upper
     
     # 1. Direct lookup
     result = soccer_teams.get(name_str)

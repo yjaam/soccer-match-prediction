@@ -1,7 +1,7 @@
 Metric,Value
-Training rows before goal filtering,21043
-Training rows removed (missing goals),268
+Training rows before goal filtering,20776
+Training rows removed (missing goals),1
 Training final rows,20775
-Test rows before goal filtering,1650
-Test rows removed (missing goals),38
+Test rows before goal filtering,1612
+Test rows removed (missing goals),0
 Test final rows,1612

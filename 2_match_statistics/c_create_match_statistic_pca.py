@@ -3,14 +3,19 @@
 
 """Build a PCA-ready match-statistics dataset from data/big5_matches.csv.
 
-This script deliberately uses only statistics already present in the scrape.
-It excludes identity-like fields such as nationality, position, shirtnumber,
-age, and minutes, imputes missing numeric values with the mean of the same
-team on that side (home or away), then standardizes the features and runs PCA.
+This script builds leakage-safe, pre-match statistics for PCA.
+
+For each numeric match-stat feature, values are derived as the mean over the
+past k matches of the same team on the same side (home or away), excluding the
+current match. This ensures inputs are available before kickoff.
+
+After this historical transformation, the script imputes remaining gaps,
+standardizes features, and runs PCA.
 """
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -57,6 +62,35 @@ def infer_team_group_column(feature_name: str) -> str:
 	if lowered.startswith("away_"):
 		return "away_team"
 	return "away_team"
+
+
+def parse_game_date_from_id(game_id: str) -> pd.Timestamp:
+	parts = str(game_id).split("_", 2)
+	if len(parts) < 3:
+		return pd.NaT
+	return pd.to_datetime(parts[0], format="%Y%m%d", errors="coerce")
+
+
+def derive_historical_features(frame: pd.DataFrame, feature_columns: list[str], k: int) -> pd.DataFrame:
+	"""Create leakage-safe pre-match features from past-k side-specific matches."""
+
+	if k < 1:
+		raise ValueError("k must be >= 1")
+
+	derived = frame.copy()
+	derived["_match_date"] = derived["game_id"].apply(parse_game_date_from_id)
+	derived = derived.sort_values(["_match_date", "game_id"]).reset_index(drop=True)
+
+	for column in feature_columns:
+		team_column = infer_team_group_column(column)
+		derived[column] = pd.to_numeric(derived[column], errors="coerce")
+
+		# Mean over the previous k matches for this team on this side (home/away).
+		derived[column] = derived.groupby(team_column, sort=False)[column].transform(
+			lambda s: s.shift(1).rolling(window=k, min_periods=1).mean()
+		)
+
+	return derived.drop(columns=["_match_date"])
 
 
 def team_mean_impute(frame: pd.DataFrame, feature_columns: list[str]) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -140,7 +174,11 @@ def team_mean_impute_with_reference(
 	return imputed, pd.DataFrame(missing_report)
 
 
-def compute_pca(feature_matrix: np.ndarray, variance_threshold: float = 0.95) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def compute_pca(
+	feature_matrix: np.ndarray,
+	n_components: int | None = None,
+	variance_threshold: float = 0.95,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 	"""Return PCA scores, components, explained variance ratios, and means.
 
 	The input is assumed to be centered and scaled before calling this helper.
@@ -157,7 +195,10 @@ def compute_pca(feature_matrix: np.ndarray, variance_threshold: float = 0.95) ->
 	explained_variance = (singular_values**2) / (n_samples - 1)
 	explained_variance_ratio = explained_variance / explained_variance.sum()
 	cumulative_variance = np.cumsum(explained_variance_ratio)
-	n_components = int(np.searchsorted(cumulative_variance, variance_threshold) + 1)
+	if n_components is None:
+		n_components = int(np.searchsorted(cumulative_variance, variance_threshold) + 1)
+	else:
+		n_components = max(1, min(int(n_components), vt.shape[0]))
 
 	components = vt[:n_components]
 	scores = feature_matrix @ components.T
@@ -207,6 +248,21 @@ def split_train_test(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def main() -> None:
+	parser = argparse.ArgumentParser(description="Build leakage-safe match-statistics PCA datasets.")
+	parser.add_argument(
+		"--k",
+		type=int,
+		default=5,
+		help="Number of past side-specific matches used to compute pre-match means (default: 5).",
+	)
+	parser.add_argument(
+		"--num-pcs",
+		type=int,
+		default=4,
+		help="Number of PCA components to save in TRAIN/TEST outputs (default: 4).",
+	)
+	args = parser.parse_args()
+
 	if not INPUT_PATH.exists():
 		print(f"Error: input file not found at {INPUT_PATH}")
 		return
@@ -237,6 +293,10 @@ def main() -> None:
 
 	if not feature_columns:
 		raise ValueError("No usable numeric match-stat columns were found.")
+
+	# Replace raw match statistics with leakage-safe historical means.
+	df = derive_historical_features(df, feature_columns, k=args.k)
+	print(f"Derived leakage-safe features using past k={args.k} home/away matches per team.")
 
 	train_df, test_df = split_train_test(df)
 	print(f"Training rows: {len(train_df)} | Test rows: {len(test_df)}")
@@ -280,7 +340,10 @@ def main() -> None:
 	train_scaled_features = ((train_feature_matrix - feature_means) / feature_stds).fillna(0.0).to_numpy(dtype=float)
 	test_scaled_features = ((test_feature_matrix - feature_means) / feature_stds).fillna(0.0).to_numpy(dtype=float)
 
-	train_components, components, explained_variance_ratio, cumulative_variance = compute_pca(train_scaled_features)
+	train_components, components, explained_variance_ratio, cumulative_variance = compute_pca(
+		train_scaled_features,
+		n_components=args.num_pcs,
+	)
 	test_components = test_scaled_features @ components.T
 
 	pc_columns = [f"PC{i+1}" for i in range(train_components.shape[1])]

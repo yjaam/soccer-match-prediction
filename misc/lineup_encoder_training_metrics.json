@@ -1,13 +1,12 @@
 {
-  "best_test_goal_nll": 2.9652139544487,
-  "best_epoch": 34,
-  "epochs_trained": 40,
-  "batch_size": 512,
-  "learning_rate": 0.0005,
-  "weight_decay": 0.0001,
-  "attention_heads": 2,
-  "dropout": 0.1,
-  "seed": 42,
-  "architecture": "attention_deep_sets",
+  "best_test_goal_nll": 2.932046413421631,
+  "best_epoch": 17,
+  "epochs_trained": 27,
+  "architecture": "2_block_transformer_encoder",
+  "num_transformer_blocks": 2,
+  "attention_heads": 4,
+  "hidden_dim": 64,
+  "player_embedding_dim": 32,
+  "output_dim": 32,
   "trained": true
 }

@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+import json
 from datetime import datetime
 from tqdm import tqdm
 
@@ -100,6 +101,7 @@ def process_fifa_ratings():
     values_path = os.path.join(project_dir, 'data', 'lineups_values.csv')
     player_ratings_path = os.path.join(project_dir, 'fifa_ratings', 'player_ratings.csv')
     output_path = os.path.join(project_dir, 'data', 'lineups_values_ratings.csv')
+    fifa_cache_path = os.path.join(project_dir, 'data', 'fifa_name_cache.json')
 
     try:
         df_lineups = pd.read_csv(lineups_path)
@@ -108,6 +110,64 @@ def process_fifa_ratings():
     except FileNotFoundError as e:
         print(f"Error loading files: {e}")
         print(f"Make sure lineups.csv, lineups_values.csv, and fifa_ratings/player_ratings.csv exist.")
+        return
+
+    # Ensure game_id exists in lineups and values (needed for incremental joins).
+    if 'game_id' not in df_lineups.columns:
+        if {'Date', 'Home Team', 'Away Team'}.issubset(df_lineups.columns):
+            df_lineups['game_id'] = (
+                df_lineups['Date'].astype(str).str.replace('-', '', regex=False)
+                + '_' + df_lineups['Home Team'].astype(str)
+                + '_' + df_lineups['Away Team'].astype(str)
+            )
+            print("Warning: game_id missing in lineups.csv, derived fallback IDs from Date/Home/Away.")
+        else:
+            raise KeyError("lineups.csv must contain game_id or Date/Home Team/Away Team columns.")
+
+    if 'game_id' not in df_values.columns:
+        if {'Date', 'Home Team', 'Away Team'}.issubset(df_values.columns):
+            game_key_map = (
+                df_lineups[['Date', 'Home Team', 'Away Team', 'game_id']]
+                .drop_duplicates(subset=['Date', 'Home Team', 'Away Team'])
+            )
+            df_values = df_values.merge(game_key_map, on=['Date', 'Home Team', 'Away Team'], how='left')
+            print("Backfilled game_id in lineups_values.csv using Date/Home/Away.")
+        else:
+            raise KeyError("lineups_values.csv must contain game_id or Date/Home Team/Away Team columns.")
+
+    # Determine pending games: only compute FIFA features for values rows not present yet.
+    df_existing = None
+    processed_ids = set()
+    if os.path.exists(output_path):
+        df_existing = pd.read_csv(output_path, low_memory=False)
+        if 'game_id' not in df_existing.columns:
+            if {'Date', 'Home Team', 'Away Team'}.issubset(df_existing.columns):
+                game_key_map_values = (
+                    df_values[['Date', 'Home Team', 'Away Team', 'game_id']]
+                    .drop_duplicates(subset=['Date', 'Home Team', 'Away Team'])
+                )
+                df_existing = df_existing.merge(
+                    game_key_map_values,
+                    on=['Date', 'Home Team', 'Away Team'],
+                    how='left'
+                )
+                print("Backfilled game_id in existing lineups_values_ratings.csv using Date/Home/Away.")
+            else:
+                df_existing['game_id'] = np.nan
+        processed_ids = set(df_existing['game_id'].dropna().astype(str))
+
+    df_values_pending = df_values[~df_values['game_id'].astype(str).isin(processed_ids)].copy()
+    df_lineups_pending = df_lineups[df_lineups['game_id'].isin(df_values_pending['game_id'])].copy()
+
+    print(f"Existing processed games: {len(processed_ids)}")
+    print(f"Pending games for FIFA lookup: {len(df_values_pending)}")
+
+    if df_values_pending.empty:
+        if df_existing is not None:
+            df_existing.to_csv(output_path, index=False, encoding='utf-8-sig')
+            print("No pending games. Kept existing lineups_values_ratings.csv (with game_id column).")
+        else:
+            print("No pending games and no existing output. Nothing to process.")
         return
 
     # Validate which position columns actually exist in the dataframe
@@ -141,6 +201,18 @@ def process_fifa_ratings():
             fifa_lookups[fifa_ver][player_name] = row.to_dict()
         print(f"  Loaded FIFA {fifa_ver}: {len(fifa_lookups[fifa_ver])} players")
 
+    # Cache for player lookup resolution: key is "<fifa_version>|<player_name>"
+    fifa_name_cache = {}
+    if os.path.exists(fifa_cache_path):
+        try:
+            with open(fifa_cache_path, 'r', encoding='utf-8') as f:
+                raw_cache = json.load(f)
+            fifa_name_cache = {str(k): v for k, v in raw_cache.items()}
+            print(f"Loaded FIFA name cache entries: {len(fifa_name_cache)}")
+        except Exception as e:
+            print(f"Warning: Failed to load FIFA name cache ({e}). Rebuilding cache this run.")
+            fifa_name_cache = {}
+
     # Enhanced match statistics
     match_stats = {
         'exact_full_name': 0,
@@ -159,6 +231,16 @@ def process_fifa_ratings():
         
         if fifa_version not in fifa_lookups:
             return None, 'missing'
+
+        cache_key = f"{int(fifa_version)}|{player_name}"
+        cached = fifa_name_cache.get(cache_key)
+        if cached is not None:
+            matched_name = cached.get('matched_name')
+            match_type = cached.get('match_type', 'missing')
+            if matched_name and matched_name in fifa_lookups[fifa_version]:
+                return fifa_lookups[fifa_version][matched_name], match_type
+            if not matched_name:
+                return None, 'missing'
         
         # Check if this player was manually mapped
         was_manually_mapped = player_name in MANUAL_NAME_MAP and MANUAL_NAME_MAP[player_name] != player_name
@@ -168,6 +250,11 @@ def process_fifa_ratings():
         
         # Try exact match
         if mapped_name in fifa_lookups[fifa_version]:
+            resolved_type = 'manual_mapping' if was_manually_mapped else 'exact_full_name'
+            fifa_name_cache[cache_key] = {
+                'matched_name': mapped_name,
+                'match_type': resolved_type,
+            }
             if was_manually_mapped:
                 return fifa_lookups[fifa_version][mapped_name], 'manual_mapping'
             return fifa_lookups[fifa_version][mapped_name], 'exact_full_name'
@@ -176,8 +263,16 @@ def process_fifa_ratings():
         last_word = mapped_name.split()[-1] if mapped_name.split() else mapped_name
         for player_key, stats in fifa_lookups[fifa_version].items():
             if player_key.endswith(last_word):
+                fifa_name_cache[cache_key] = {
+                    'matched_name': player_key,
+                    'match_type': 'exact_last_name',
+                }
                 return stats, 'exact_last_name'
         
+        fifa_name_cache[cache_key] = {
+            'matched_name': None,
+            'match_type': 'missing',
+        }
         return None, 'missing'
 
     def get_group_stats(row, position_group, fifa_version):
@@ -241,11 +336,12 @@ def process_fifa_ratings():
     print("\nProcessing matches and calculating averaged FIFA ratings...")
     fifa_results = []
     
-    for idx, row in tqdm(df_lineups.iterrows(), total=len(df_lineups), desc="Processing matches"):
+    for idx, row in tqdm(df_lineups_pending.iterrows(), total=len(df_lineups_pending), desc="Processing matches"):
         match_date = row.get('Date', '')
         fifa_version = get_fifa_version_for_date(match_date)
         
         match_summary = {
+            'game_id': row.get('game_id', ''),
             'Date': row.get('Date', ''),
             'Home Team': row.get('Home Team', ''),
             'Away Team': row.get('Away Team', ''),
@@ -263,15 +359,41 @@ def process_fifa_ratings():
     
     # Merge FIFA ratings with market values
     print("Merging FIFA ratings with market values...")
-    df_combined = pd.merge(df_values, df_fifa_results, on=['Date', 'Home Team', 'Away Team'], how='left')
+    df_combined_new = pd.merge(df_values_pending, df_fifa_results, on='game_id', how='left', suffixes=('', '_fifa'))
+
+    # Resolve duplicate key columns from merge and keep canonical base columns from df_values_pending.
+    for col in ['Date', 'Home Team', 'Away Team']:
+        alt = f"{col}_fifa"
+        if alt in df_combined_new.columns:
+            if col not in df_combined_new.columns:
+                df_combined_new[col] = df_combined_new[alt]
+            df_combined_new = df_combined_new.drop(columns=[alt])
+
+    if df_existing is not None:
+        df_combined = pd.concat([df_existing, df_combined_new], ignore_index=True)
+    else:
+        df_combined = df_combined_new
+
+    if 'game_id' in df_combined.columns:
+        df_combined = df_combined.drop_duplicates(subset=['game_id'], keep='first')
+
+    if 'Date' in df_combined.columns:
+        df_combined = df_combined.sort_values('Date').reset_index(drop=True)
 
     # Save the result
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df_combined.to_csv(output_path, index=False, encoding='utf-8-sig')
+
+    # Persist FIFA name cache for future runs.
+    os.makedirs(os.path.dirname(fifa_cache_path), exist_ok=True)
+    with open(fifa_cache_path, 'w', encoding='utf-8') as f:
+        json.dump(fifa_name_cache, f, ensure_ascii=False, indent=2)
+    print(f"Saved FIFA name cache: {fifa_cache_path} ({len(fifa_name_cache)} entries)")
     
     # Enhanced matching statistics output
     total_matched = match_stats['exact_full_name'] + match_stats['exact_last_name'] + match_stats['manual_mapping']
     total_lookups = match_stats['total_lookups']
+    total_lookups_safe = max(total_lookups, 1)
     
     print("\n" + "="*60)
     print("FIFA RATINGS MATCHING STATISTICS")
@@ -279,21 +401,22 @@ def process_fifa_ratings():
     print(f"Total player lookups: {total_lookups:,}")
     print(f"")
     print(f"Match Quality Breakdown:")
-    print(f"  Exact full name matches: {match_stats['exact_full_name']:,} ({match_stats['exact_full_name']/total_lookups*100:.1f}%)")
-    print(f"  Exact last name matches: {match_stats['exact_last_name']:,} ({match_stats['exact_last_name']/total_lookups*100:.1f}%)")
-    print(f"  Manual mapping matches:  {match_stats['manual_mapping']:,} ({match_stats['manual_mapping']/total_lookups*100:.1f}%)")
-    print(f"  Total matched:           {total_matched:,} ({total_matched/total_lookups*100:.1f}%)")
-    print(f"  Missing:                 {match_stats['missing']:,} ({match_stats['missing']/total_lookups*100:.1f}%)")
+    print(f"  Exact full name matches: {match_stats['exact_full_name']:,} ({match_stats['exact_full_name']/total_lookups_safe*100:.1f}%)")
+    print(f"  Exact last name matches: {match_stats['exact_last_name']:,} ({match_stats['exact_last_name']/total_lookups_safe*100:.1f}%)")
+    print(f"  Manual mapping matches:  {match_stats['manual_mapping']:,} ({match_stats['manual_mapping']/total_lookups_safe*100:.1f}%)")
+    print(f"  Total matched:           {total_matched:,} ({total_matched/total_lookups_safe*100:.1f}%)")
+    print(f"  Missing:                 {match_stats['missing']:,} ({match_stats['missing']/total_lookups_safe*100:.1f}%)")
     
     # Unique player statistics
     unique_players_looked_up = len(set(list(matched_players.keys()) + missing_players))
     unique_matched = len(matched_players)
     unique_missing = len(set(missing_players))
+    unique_players_looked_up_safe = max(unique_players_looked_up, 1)
     
     print(f"\nUnique Player Statistics:")
     print(f"  Unique players found:    {unique_players_looked_up:,}")
-    print(f"  Unique players matched:  {unique_matched:,} ({unique_matched/unique_players_looked_up*100:.1f}%)")
-    print(f"  Unique players missing:  {unique_missing:,} ({unique_missing/unique_players_looked_up*100:.1f}%)")
+    print(f"  Unique players matched:  {unique_matched:,} ({unique_matched/unique_players_looked_up_safe*100:.1f}%)")
+    print(f"  Unique players missing:  {unique_missing:,} ({unique_missing/unique_players_looked_up_safe*100:.1f}%)")
     
     # Match type distribution for unique players
     unique_match_types = {}
@@ -313,7 +436,8 @@ def process_fifa_ratings():
         if len(unique_missing_list) > 15:
             print(f"  ... and {len(unique_missing_list) - 15} more")
     
-    print(f"\nProcessed {len(df_lineups)} matches")
+    print(f"\nNew matches processed: {len(df_lineups_pending)}")
+    print(f"Total matches in output: {len(df_combined)}")
     print(f"Output columns: {len(df_combined.columns)}")
     print(f"Saved to: {output_path}")
     print("="*60)

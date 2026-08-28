@@ -10,15 +10,15 @@ import pandas as pd
 # Import the resolver function you saved
 try:
     # If running from the root directory (should work with the fix below)
-    from src.team_name_mapping_FINAL import resolve_team_name
+    from src.team_name_mapping_FINAL import resolve_team_name, resolve_team_name_fuzzy
 except ModuleNotFoundError:
     try:
         # If running directly from inside the src/ directory
-        from team_name_mapping_FINAL import resolve_team_name
+        from team_name_mapping_FINAL import resolve_team_name, resolve_team_name_fuzzy
     except ModuleNotFoundError:
         # If script is in a subfolder (like 1_player_stats), add parent to path
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from src.team_name_mapping_FINAL import resolve_team_name
+        from src.team_name_mapping_FINAL import resolve_team_name, resolve_team_name_fuzzy
 
 
 HEADERS = {
@@ -45,35 +45,62 @@ COMPETITION_STANDARDIZATION = {
     "Champions League": "champions-league"
 }
 
+
+def resolve_team_code(name: str):
+    """Resolve a scraped team name to the canonical team code with exact then fuzzy matching."""
+    code = resolve_team_name(name)
+    if code is not None:
+        return code
+    return resolve_team_name_fuzzy(name)
+
 def fetch(url: str) -> str:
     r = requests.get(url, headers=HEADERS, timeout=30)
     r.raise_for_status()
     return r.text
 
-def parse_rotowire_date(date_str: str) -> datetime.date:
+def parse_rotowire_date(date_str: str):
     """
-    Converts Rotowire relative strings like "FRI 2:30 PM" or "MAY 8 9:00 AM" 
-    into actual datetime.date objects for math comparison.
+    Convert Rotowire time labels into match dates.
+    Supports weekday labels and both abbreviated/full month names.
+    Returns None if the date text cannot be parsed.
     """
     today = datetime.today().date()
-    date_str = date_str.strip().upper()
+    if not date_str:
+        return None
+
+    date_str = str(date_str).strip()
+    if not date_str:
+        return None
+    upper = date_str.upper()
+
+    if upper.startswith("TODAY"):
+        return today
+    if upper.startswith("TOMORROW"):
+        return today + timedelta(days=1)
     
-    # 1) Check for Month format (e.g. "MAY 8" or "MAY 8 2:30 PM")
-    month_match = re.match(r'(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d+)', date_str)
+    # 1) Check for Month format (e.g. "AUG 22" or "August 22 10:00 AM ET")
+    month_match = re.match(
+        r'(JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|JUL(?:Y)?|AUG(?:UST)?|'
+        r'SEP(?:TEMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?)\s+(\d{1,2})(?:\s*,?\s*(\d{4}))?',
+        upper,
+    )
     if month_match:
-        month_str, day_str = month_match.groups()
-        month = datetime.strptime(month_str, '%b').month
+        month_token, day_str, year_str = month_match.groups()
+        month = datetime.strptime(month_token[:3], '%b').month
         day = int(day_str)
-        
-        parsed_date = datetime(today.year, month, day).date()
+
+        year = int(year_str) if year_str else today.year
+        parsed_date = datetime(year, month, day).date()
+
+        # If season wraps year-end and year is omitted, roll forward.
         if parsed_date < today - timedelta(days=30):
-            parsed_date = datetime(today.year + 1, month, day).date()
+            parsed_date = datetime(year + 1, month, day).date()
         return parsed_date
 
     # 2) Check for Weekday format (e.g. "FRI 2:30 PM")
-    weekday_match = re.match(r'(MON|TUE|WED|THU|FRI|SAT|SUN)', date_str)
+    weekday_match = re.match(r'(MON(?:DAY)?|TUE(?:SDAY)?|WED(?:NESDAY)?|THU(?:RSDAY)?|FRI(?:DAY)?|SAT(?:URDAY)?|SUN(?:DAY)?)', upper)
     if weekday_match:
-        wd_str = weekday_match.group(1)
+        wd_str = weekday_match.group(1)[:3]
         weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
         target_wd = weekdays.index(wd_str)
         today_wd = today.weekday()
@@ -84,7 +111,16 @@ def parse_rotowire_date(date_str: str) -> datetime.date:
             
         return today + timedelta(days=diff)
 
-    return today
+    # 3) Generic fallback parser (handles uncommon but valid date strings)
+    cleaned = re.sub(r'\bET\b', '', date_str, flags=re.IGNORECASE).strip()
+    parsed = pd.to_datetime(cleaned, errors='coerce')
+    if pd.notna(parsed):
+        parsed_date = parsed.date()
+        if parsed_date < today - timedelta(days=30) and parsed.year == today.year:
+            parsed_date = datetime(today.year + 1, parsed.month, parsed.day).date()
+        return parsed_date
+
+    return None
 
 def parse_players(li_elements: list) -> tuple[str, list[str], list[str], list[str]]:
     """
@@ -152,6 +188,11 @@ def scrape_league(league_name: str, league_code: str) -> list:
         raw_date_str = time_el.get_text(" ", strip=True) if time_el else ""
         
         parsed_date = parse_rotowire_date(raw_date_str)
+        if parsed_date is None:
+            # Keep scraper robust if Rotowire omits/changes time text for a card.
+            if first_match_date is None:
+                continue
+            parsed_date = first_match_date
         
         if first_match_date is None:
             first_match_date = parsed_date
@@ -223,9 +264,20 @@ def main():
     
     # Format and reorder columns
     if not df_scraped.empty:
-        # Apply the resolver function to standardise team names before doing anything else
-        df_scraped['Home Team'] = df_scraped['Home Team'].apply(resolve_team_name)
-        df_scraped['Away Team'] = df_scraped['Away Team'].apply(resolve_team_name)
+        # Keep raw team names for diagnostics and resolve with exact+fuzzy fallback.
+        df_scraped['Home Team Raw'] = df_scraped['Home Team']
+        df_scraped['Away Team Raw'] = df_scraped['Away Team']
+        df_scraped['Home Team'] = df_scraped['Home Team Raw'].apply(resolve_team_code)
+        df_scraped['Away Team'] = df_scraped['Away Team Raw'].apply(resolve_team_code)
+
+        unresolved_home = df_scraped[df_scraped['Home Team'].isna()]['Home Team Raw'].dropna().unique().tolist()
+        unresolved_away = df_scraped[df_scraped['Away Team'].isna()]['Away Team Raw'].dropna().unique().tolist()
+        unresolved = sorted(set(unresolved_home + unresolved_away))
+
+        if unresolved:
+            print(f"\nWarning: {len(unresolved)} team names could not be resolved to IDs.")
+            for team_name in unresolved:
+                print(f"  - {team_name}")
 
         # Base columns updated to include Competition
         base_cols = ["Competition", "Date", "Home Team", "Away Team"]
