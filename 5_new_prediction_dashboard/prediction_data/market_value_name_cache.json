@@ -1,0 +1,5657 @@
+{
+  "G. Vidovic": {
+    "value": 3000000.0,
+    "matched_name": "Vidovic",
+    "score": 0.8235294222831726
+  },
+  "Gonzalo Garcia": {
+    "value": 30000000.0,
+    "matched_name": "Gonzalo García",
+    "score": 0.9285714030265808
+  },
+  "A. Romano": {
+    "value": 500000.0,
+    "matched_name": "Romano",
+    "score": 0.800000011920929
+  },
+  "Kim Min-Jae": {
+    "value": 300000.0,
+    "matched_name": "Kike Linares",
+    "score": 0.6086956262588501
+  },
+  "H. Kamara": {
+    "value": 40000000.0,
+    "matched_name": "Kamara",
+    "score": 0.800000011920929
+  },
+  "S. El Mourabet": {
+    "value": 22000000.0,
+    "matched_name": "El Mourabet",
+    "score": 0.8799999952316284
+  },
+  "W. Falcone": {
+    "value": 3500000.0,
+    "matched_name": "Falcone",
+    "score": 0.8235294222831726
+  },
+  "M. Aebischer": {
+    "value": 4000000.0,
+    "matched_name": "Aebischer",
+    "score": 0.8571428656578064
+  },
+  "J. Anthony": {
+    "value": 300000.0,
+    "matched_name": "Anthony",
+    "score": 0.8235294222831726
+  },
+  "Emil Holm": {
+    "value": 10000000.0,
+    "matched_name": "Emil Holm",
+    "score": 1.0
+  },
+  "B. El Khannouss": {
+    "value": 35000000.0,
+    "matched_name": "El Khannouss",
+    "score": 0.8888888359069824
+  },
+  "Raphinha": {
+    "value": 70000000.0,
+    "matched_name": "Raphinha",
+    "score": 1.0
+  },
+  "Alberto Moleiro": {
+    "value": 50000000.0,
+    "matched_name": "Alberto Moleiro",
+    "score": 1.0
+  },
+  "D. Ljubicic": {
+    "value": 5000000.0,
+    "matched_name": "Ljubicic",
+    "score": 0.8421052694320679
+  },
+  "Orel Mangala": {
+    "value": 9000000.0,
+    "matched_name": "Orel Mangala",
+    "score": 1.0
+  },
+  "Leo Ostigard": {
+    "value": 13000000.0,
+    "matched_name": "Leo Østigård",
+    "score": 0.8333333730697632
+  },
+  "A. Theate": {
+    "value": 17000000.0,
+    "matched_name": "Theate",
+    "score": 0.800000011920929
+  },
+  "A. Hainaut": {
+    "value": 1700000.0,
+    "matched_name": "Hainaut",
+    "score": 0.8235294222831726
+  },
+  "Akor Adams": {
+    "value": 15000000.0,
+    "matched_name": "Akor Adams",
+    "score": 1.0
+  },
+  "Matej Kovar": {
+    "value": 8000000.0,
+    "matched_name": "Matej Kovar",
+    "score": 1.0
+  },
+  "M. Alonso": {
+    "value": 3500000.0,
+    "matched_name": "Alonso",
+    "score": 0.800000011920929
+  },
+  "K. Laimer": {
+    "value": 32000000.0,
+    "matched_name": "Laimer",
+    "score": 0.800000011920929
+  },
+  "A. Ibrahimovic": {
+    "value": 10000000.0,
+    "matched_name": "Ibrahimovic",
+    "score": 0.8799999952316284
+  },
+  "Marc Guehi": {
+    "value": 70000000.0,
+    "matched_name": "Marc Guéhi",
+    "score": 0.8999999761581421
+  },
+  "C. Bassey": {
+    "value": 28000000.0,
+    "matched_name": "Bassey",
+    "score": 0.800000011920929
+  },
+  "Lee Jae-Sung": {
+    "value": 200000.0,
+    "matched_name": "Leke James",
+    "score": 0.6363636255264282
+  },
+  "O. Marmoush": {
+    "value": 50000000.0,
+    "matched_name": "Marmoush",
+    "score": 0.8421052694320679
+  },
+  "Ivan Romero": {
+    "value": 8000000.0,
+    "matched_name": "Iván Romero",
+    "score": 0.9090908765792847
+  },
+  "Javi Guerra": {
+    "value": 25000000.0,
+    "matched_name": "Javi Guerra",
+    "score": 1.0
+  },
+  "M. Pieringer": {
+    "value": 3000000.0,
+    "matched_name": "Pieringer",
+    "score": 0.8571428656578064
+  },
+  "J. Schuster": {
+    "value": 18000000.0,
+    "matched_name": "Schuster",
+    "score": 0.8421052694320679
+  },
+  "Yunus Musah": {
+    "value": 14000000.0,
+    "matched_name": "Yunus Musah",
+    "score": 1.0
+  },
+  "Ethan Ampadu": {
+    "value": 30000000.0,
+    "matched_name": "Ethan Ampadu",
+    "score": 1.0
+  },
+  "M. Ljubicic": {
+    "value": 5000000.0,
+    "matched_name": "Ljubicic",
+    "score": 0.8421052694320679
+  },
+  "G. Mendoza": {
+    "value": 20000000.0,
+    "matched_name": "Mendoza",
+    "score": 0.8235294222831726
+  },
+  "Granit Xhaka": {
+    "value": 8000000.0,
+    "matched_name": "Granit Xhaka",
+    "score": 1.0
+  },
+  "Buba Sangare": {
+    "value": 4500000.0,
+    "matched_name": "Buba Sangaré",
+    "score": 0.9166666269302368
+  },
+  "O. Provstgaard": {
+    "value": 16000000.0,
+    "matched_name": "Provstgaard",
+    "score": 0.8799999952316284
+  },
+  "Mark Flekken": {
+    "value": 6000000.0,
+    "matched_name": "Mark Flekken",
+    "score": 1.0
+  },
+  "Archie Brown": {
+    "value": 12000000.0,
+    "matched_name": "Archie Brown",
+    "score": 1.0
+  },
+  "S. El-Faouzi": {
+    "value": 200000.0,
+    "matched_name": "El-Azzouzi",
+    "score": 0.6363636255264282
+  },
+  "D. Henderson": {
+    "value": 28000000.0,
+    "matched_name": "Henderson",
+    "score": 0.8571428656578064
+  },
+  "Clement Akpa": {
+    "value": 9000000.0,
+    "matched_name": "Clément Akpa",
+    "score": 0.9166666269302368
+  },
+  "Y. Herrera": {
+    "value": 6500000.0,
+    "matched_name": "Herrera",
+    "score": 0.8235294222831726
+  },
+  "N. Seiwald": {
+    "value": 25000000.0,
+    "matched_name": "Seiwald",
+    "score": 0.8235294222831726
+  },
+  "John Egan": {
+    "value": 1000000.0,
+    "matched_name": "John Egan",
+    "score": 1.0
+  },
+  "E. Camavinga": {
+    "value": 50000000.0,
+    "matched_name": "Camavinga",
+    "score": 0.8571428656578064
+  },
+  "C. Richards": {
+    "value": 28000000.0,
+    "matched_name": "Richards",
+    "score": 0.8421052694320679
+  },
+  "Lucas Digne": {
+    "value": 6000000.0,
+    "matched_name": "Lucas Digne",
+    "score": 1.0
+  },
+  "Matteo Prati": {
+    "value": 5500000.0,
+    "matched_name": "Matteo Prati",
+    "score": 1.0
+  },
+  "Oscar Valentin": {
+    "value": 2000000.0,
+    "matched_name": "Óscar Valentín",
+    "score": 0.8571428656578064
+  },
+  "Mateus Fernandes": {
+    "value": 50000000.0,
+    "matched_name": "Mateus Fernandes",
+    "score": 1.0
+  },
+  "Pablo Ramon": {
+    "value": 400000.0,
+    "matched_name": "Pablo Ramón",
+    "score": 0.9090908765792847
+  },
+  "E. Delprato": {
+    "value": 6000000.0,
+    "matched_name": "Delprato",
+    "score": 0.8421052694320679
+  },
+  "Andy Diouf": {
+    "value": 20000000.0,
+    "matched_name": "Andy Diouf",
+    "score": 1.0
+  },
+  "X. Schlager": {
+    "value": 10000000.0,
+    "matched_name": "Schlager",
+    "score": 0.8421052694320679
+  },
+  "Pablo Maffeo": {
+    "value": 3000000.0,
+    "matched_name": "Pablo Maffeo",
+    "score": 1.0
+  },
+  "Mio Backhaus": {
+    "value": 15000000.0,
+    "matched_name": "Mio Backhaus",
+    "score": 1.0
+  },
+  "M. Konecny": {
+    "value": 2500000.0,
+    "matched_name": "Konecny",
+    "score": 0.8235294222831726
+  },
+  "I. Monterisi": {
+    "value": 2800000.0,
+    "matched_name": "Monterisi",
+    "score": 0.8571428656578064
+  },
+  "D. Coppola": {
+    "value": 18000000.0,
+    "matched_name": "Coppola",
+    "score": 0.8235294222831726
+  },
+  "L. Camara": {
+    "value": 40000000.0,
+    "matched_name": "Camara",
+    "score": 0.800000011920929
+  },
+  "O. Boscagli": {
+    "value": 15000000.0,
+    "matched_name": "Boscagli",
+    "score": 0.8421052694320679
+  },
+  "T. George": {
+    "value": 20000000.0,
+    "matched_name": "George",
+    "score": 0.800000011920929
+  },
+  "A. Remiro": {
+    "value": 9000000.0,
+    "matched_name": "Remiro",
+    "score": 0.800000011920929
+  },
+  "A. Muric": {
+    "value": 1800000.0,
+    "matched_name": "Muric",
+    "score": 0.7692307829856873
+  },
+  "L. Stassin": {
+    "value": 15000000.0,
+    "matched_name": "Stassin",
+    "score": 0.8235294222831726
+  },
+  "Q. Timber": {
+    "value": 70000000.0,
+    "matched_name": "Timber",
+    "score": 0.800000011920929
+  },
+  "A. Ouzenadji": {
+    "value": 3000000.0,
+    "matched_name": "Auzmendi",
+    "score": 0.699999988079071
+  },
+  "E. Nuamah": {
+    "value": 10000000.0,
+    "matched_name": "Nuamah",
+    "score": 0.800000011920929
+  },
+  "Victor Chust": {
+    "value": 3500000.0,
+    "matched_name": "Víctor Chust",
+    "score": 0.9166666269302368
+  },
+  "C. Makosso": {
+    "value": 600000.0,
+    "matched_name": "Makosso",
+    "score": 0.8235294222831726
+  },
+  "Robin Koch": {
+    "value": 10000000.0,
+    "matched_name": "Robin Koch",
+    "score": 1.0
+  },
+  "M. Beier": {
+    "value": 40000000.0,
+    "matched_name": "Beier",
+    "score": 0.7692307829856873
+  },
+  "K. Mainoo": {
+    "value": 70000000.0,
+    "matched_name": "Mainoo",
+    "score": 0.800000011920929
+  },
+  "Sasa Lukic": {
+    "value": 10000000.0,
+    "matched_name": "Saša Lukić",
+    "score": 0.800000011920929
+  },
+  "M. Zaccagni": {
+    "value": 7500000.0,
+    "matched_name": "Zaccagni",
+    "score": 0.8421052694320679
+  },
+  "Pape Gueye": {
+    "value": 40000000.0,
+    "matched_name": "Pape Gueye",
+    "score": 1.0
+  },
+  "N. Vlasic": {
+    "value": 50000.0,
+    "matched_name": "Vlasic",
+    "score": 0.800000011920929
+  },
+  "M. Cuisance": {
+    "value": 2000000.0,
+    "matched_name": "Cuisance",
+    "score": 0.8421052694320679
+  },
+  "Rayan Bamba": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "P. Wimmer": {
+    "value": 12000000.0,
+    "matched_name": "Wimmer",
+    "score": 0.800000011920929
+  },
+  "J. Beste": {
+    "value": 10000000.0,
+    "matched_name": "Beste",
+    "score": 0.7692307829856873
+  },
+  "B. van den Boomen": {
+    "value": 2500000.0,
+    "matched_name": "van den Boomen",
+    "score": 0.9032257795333862
+  },
+  "S. Szymanski": {
+    "value": 12000000.0,
+    "matched_name": "Szymanski",
+    "score": 0.8571428656578064
+  },
+  "N. Fagioli": {
+    "value": 16000000.0,
+    "matched_name": "Fagioli",
+    "score": 0.8235294222831726
+  },
+  "E. Stroud": {
+    "value": 5000000.0,
+    "matched_name": "Stroud",
+    "score": 0.800000011920929
+  },
+  "A. Aouchiche": {
+    "value": 2200000.0,
+    "matched_name": "Aouchiche",
+    "score": 0.8571428656578064
+  },
+  "Jay Robinson": {
+    "value": 8000000.0,
+    "matched_name": "Jay Robinson",
+    "score": 1.0
+  },
+  "E. Mason-Clark": {
+    "value": 100000.0,
+    "matched_name": "Harrison Clark",
+    "score": 0.6428571343421936
+  },
+  "O. Baumann": {
+    "value": 2500000.0,
+    "matched_name": "Baumann",
+    "score": 0.8235294222831726
+  },
+  "Joao Pedro": {
+    "value": 80000000.0,
+    "matched_name": "João Pedro",
+    "score": 0.8999999761581421
+  },
+  "A. Rudiger": {
+    "value": 6000000.0,
+    "matched_name": "Rüdiger",
+    "score": 0.7058823108673096
+  },
+  "V. Lindelof": {
+    "value": 5000000.0,
+    "matched_name": "Lindelöf",
+    "score": 0.7368420958518982
+  },
+  "A. Oyono": {
+    "value": 2000000.0,
+    "matched_name": "Oyono",
+    "score": 0.7692307829856873
+  },
+  "Josh King": {
+    "value": 25000000.0,
+    "matched_name": "Josh King",
+    "score": 1.0
+  },
+  "Terem Moffi": {
+    "value": 8000000.0,
+    "matched_name": "Terem Moffi",
+    "score": 1.0
+  },
+  "Eray Comert": {
+    "value": 2500000.0,
+    "matched_name": "Eray Cömert",
+    "score": 0.9090908765792847
+  },
+  "M. Gutierrez": {
+    "value": 22000000.0,
+    "matched_name": "Gutiérrez",
+    "score": 0.761904776096344
+  },
+  "Jacobo Ramon": {
+    "value": 30000000.0,
+    "matched_name": "Jacobo Ramón",
+    "score": 0.9166666269302368
+  },
+  "Ahmed Touba": {
+    "value": 2500000.0,
+    "matched_name": "Ahmed Touba",
+    "score": 1.0
+  },
+  "S. Tanaka": {
+    "value": 13000000.0,
+    "matched_name": "Tanaka",
+    "score": 0.800000011920929
+  },
+  "G. Hein": {
+    "value": 5000000.0,
+    "matched_name": "Hein",
+    "score": 0.7272727489471436
+  },
+  "T. Pobega": {
+    "value": 8000000.0,
+    "matched_name": "Pobega",
+    "score": 0.800000011920929
+  },
+  "Destiny Udogie": {
+    "value": 30000000.0,
+    "matched_name": "Destiny Udogie",
+    "score": 1.0
+  },
+  "S. Chergui": {
+    "value": 3000000.0,
+    "matched_name": "Chergui",
+    "score": 0.8235294222831726
+  },
+  "Adam Wharton": {
+    "value": 70000000.0,
+    "matched_name": "Adam Wharton",
+    "score": 1.0
+  },
+  "K. Scherpen": {
+    "value": 8000000.0,
+    "matched_name": "Scherpen",
+    "score": 0.8421052694320679
+  },
+  "James Hill": {
+    "value": 23000000.0,
+    "matched_name": "James Hill",
+    "score": 1.0
+  },
+  "C. Arcus": {
+    "value": 1800000.0,
+    "matched_name": "Arcus",
+    "score": 0.7692307829856873
+  },
+  "D. Zakaria": {
+    "value": 25000000.0,
+    "matched_name": "Zakaria",
+    "score": 0.8235294222831726
+  },
+  "Sergio Gomez": {
+    "value": 15000000.0,
+    "matched_name": "Sergio Gómez",
+    "score": 0.9166666269302368
+  },
+  "R. Obermair": {
+    "value": 800000.0,
+    "matched_name": "Obermair",
+    "score": 0.8421052694320679
+  },
+  "Alisson": {
+    "value": 15000000.0,
+    "matched_name": "Alisson",
+    "score": 1.0
+  },
+  "R. Aguilar": {
+    "value": 2500000.0,
+    "matched_name": "Aguilar",
+    "score": 0.8235294222831726
+  },
+  "O. Giroud": {
+    "value": 900000.0,
+    "matched_name": "Giroud",
+    "score": 0.800000011920929
+  },
+  "Paul Mendy": {
+    "value": 7000000.0,
+    "matched_name": "Paul Mendy",
+    "score": 1.0
+  },
+  "Luismi Cruz": {
+    "value": 600000.0,
+    "matched_name": "Luismi Cruz",
+    "score": 1.0
+  },
+  "Oso": {
+    "value": 10000000.0,
+    "matched_name": "Oso",
+    "score": 1.0
+  },
+  "Mario Martin": {
+    "value": 10000000.0,
+    "matched_name": "Mario Martín",
+    "score": 0.9166666269302368
+  },
+  "Mamadou Diop": {
+    "value": 150000.0,
+    "matched_name": "Mamadou Diallo",
+    "score": 0.8461538553237915
+  },
+  "A. Semenyo": {
+    "value": 80000000.0,
+    "matched_name": "Semenyo",
+    "score": 0.8235294222831726
+  },
+  "J. Mickels": {
+    "value": 100000.0,
+    "matched_name": "Mickel",
+    "score": 0.75
+  },
+  "Michel Adopo": {
+    "value": 7000000.0,
+    "matched_name": "Michel Adopo",
+    "score": 1.0
+  },
+  "J. Salinas": {
+    "value": 2000000.0,
+    "matched_name": "Salinas",
+    "score": 0.8235294222831726
+  },
+  "Filip Kostic": {
+    "value": 2000000.0,
+    "matched_name": "Filip Kostić",
+    "score": 0.9166666269302368
+  },
+  "A. Rabiot": {
+    "value": 18000000.0,
+    "matched_name": "Rabiot",
+    "score": 0.800000011920929
+  },
+  "Axel Disasi": {
+    "value": 15000000.0,
+    "matched_name": "Axel Disasi",
+    "score": 1.0
+  },
+  "A. Sivera": {
+    "value": 6000000.0,
+    "matched_name": "Sivera",
+    "score": 0.800000011920929
+  },
+  "L. Colombo": {
+    "value": 10000000.0,
+    "matched_name": "Colombo",
+    "score": 0.8235294222831726
+  },
+  "L. Hornicek": {
+    "value": 18000000.0,
+    "matched_name": "Hornicek",
+    "score": 0.8421052694320679
+  },
+  "G. Bouare": {
+    "value": 300000.0,
+    "matched_name": "Goure",
+    "score": 0.7142857313156128
+  },
+  "J. Bijlow": {
+    "value": 4000000.0,
+    "matched_name": "Bijlow",
+    "score": 0.800000011920929
+  },
+  "Josep Martinez": {
+    "value": 10000000.0,
+    "matched_name": "Josep Martínez",
+    "score": 0.9285714030265808
+  },
+  "N. Nkounkou": {
+    "value": 2600000.0,
+    "matched_name": "Nkounkou",
+    "score": 0.8421052694320679
+  },
+  "Douglas Luiz": {
+    "value": 18000000.0,
+    "matched_name": "Douglas Luiz",
+    "score": 1.0
+  },
+  "M. Folorunsho": {
+    "value": 5000000.0,
+    "matched_name": "Folorunsho",
+    "score": 0.8695651888847351
+  },
+  "Kodai Sano": {
+    "value": 12000000.0,
+    "matched_name": "Kodai Sano",
+    "score": 1.0
+  },
+  "G. Gineitis": {
+    "value": 5500000.0,
+    "matched_name": "Gineitis",
+    "score": 0.8421052694320679
+  },
+  "F. Buonanotte": {
+    "value": 12000000.0,
+    "matched_name": "Buonanotte",
+    "score": 0.8695651888847351
+  },
+  "Jesus Vazquez": {
+    "value": 4000000.0,
+    "matched_name": "Jesús Vázquez",
+    "score": 0.8461538553237915
+  },
+  "Andres Castrin": {
+    "value": 6000000.0,
+    "matched_name": "Andrés Castrín",
+    "score": 0.8571428656578064
+  },
+  "Cole Palmer": {
+    "value": 100000000.0,
+    "matched_name": "Cole Palmer",
+    "score": 1.0
+  },
+  "M. Llorente": {
+    "value": 20000000.0,
+    "matched_name": "Llorente",
+    "score": 0.8421052694320679
+  },
+  "P. Frankowski": {
+    "value": 6000000.0,
+    "matched_name": "Frankowski",
+    "score": 0.8695651888847351
+  },
+  "M. Osmajic": {
+    "value": 2000000.0,
+    "matched_name": "Osmajic",
+    "score": 0.8235294222831726
+  },
+  "U. Rahmonaliyev": {
+    "value": 600000.0,
+    "matched_name": "Rakhmonaliev",
+    "score": 0.8148148059844971
+  },
+  "N. Kristof": {
+    "value": 200000.0,
+    "matched_name": "Kristof Maes",
+    "score": 0.6363636255264282
+  },
+  "A. Kouassi": {
+    "value": 15000000.0,
+    "matched_name": "Kouassi",
+    "score": 0.8235294222831726
+  },
+  "T. Baldanzi": {
+    "value": 8500000.0,
+    "matched_name": "Baldanzi",
+    "score": 0.8421052694320679
+  },
+  "D. Moller Wolfe": {
+    "value": 8000000.0,
+    "matched_name": "David Møller Wolfe",
+    "score": 0.7878788113594055
+  },
+  "L. Koleosho": {
+    "value": 6000000.0,
+    "matched_name": "Koleosho",
+    "score": 0.8421052694320679
+  },
+  "Rayan": {
+    "value": 60000000.0,
+    "matched_name": "Rayan",
+    "score": 1.0
+  },
+  "Mousa Tamari": {
+    "value": 10000000.0,
+    "matched_name": "Mousa Tamari",
+    "score": 1.0
+  },
+  "Lewis Hall": {
+    "value": 40000000.0,
+    "matched_name": "Lewis Hall",
+    "score": 1.0
+  },
+  "R. Terrats": {
+    "value": 3000000.0,
+    "matched_name": "Terrats",
+    "score": 0.8235294222831726
+  },
+  "S. Tonali": {
+    "value": 80000000.0,
+    "matched_name": "Tonali",
+    "score": 0.800000011920929
+  },
+  "Ilaix Moriba": {
+    "value": 15000000.0,
+    "matched_name": "Ilaix Moriba",
+    "score": 1.0
+  },
+  "Mikey Moore": {
+    "value": 18000000.0,
+    "matched_name": "Mikey Moore",
+    "score": 1.0
+  },
+  "Lewis Dunk": {
+    "value": 3500000.0,
+    "matched_name": "Lewis Dunk",
+    "score": 1.0
+  },
+  "Pablo Barrios": {
+    "value": 55000000.0,
+    "matched_name": "Pablo Barrios",
+    "score": 1.0
+  },
+  "Vanderson": {
+    "value": 18000000.0,
+    "matched_name": "Vanderson",
+    "score": 1.0
+  },
+  "W. Zaire-Emery": {
+    "value": 80000000.0,
+    "matched_name": "Zaïre-Emery",
+    "score": 0.800000011920929
+  },
+  "R. Schmid": {
+    "value": 15000000.0,
+    "matched_name": "Schmid",
+    "score": 0.800000011920929
+  },
+  "G. Gudmundsson": {
+    "value": 20000000.0,
+    "matched_name": "Gudmundsson",
+    "score": 0.8799999952316284
+  },
+  "Ozan Kabak": {
+    "value": 15000000.0,
+    "matched_name": "Ozan Kabak",
+    "score": 1.0
+  },
+  "Ximo Navarro": {
+    "value": 600000.0,
+    "matched_name": "Ximo Navarro",
+    "score": 1.0
+  },
+  "J. Agirrezabala": {
+    "value": 9000000.0,
+    "matched_name": "Agirrezabala",
+    "score": 0.8888888359069824
+  },
+  "A. Castro-Montes": {
+    "value": 2500000.0,
+    "matched_name": "Castro-Montes",
+    "score": 0.8965517282485962
+  },
+  "I. Saibari": {
+    "value": 40000000.0,
+    "matched_name": "Saibari",
+    "score": 0.8235294222831726
+  },
+  "Igor Thiago": {
+    "value": 65000000.0,
+    "matched_name": "Igor Thiago",
+    "score": 1.0
+  },
+  "Julio Enciso": {
+    "value": 25000000.0,
+    "matched_name": "Julio Enciso",
+    "score": 1.0
+  },
+  "I. Doukoure": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Nathan Ake": {
+    "value": 12000000.0,
+    "matched_name": "Nathan Aké",
+    "score": 0.8999999761581421
+  },
+  "N. Jackson": {
+    "value": 40000000.0,
+    "matched_name": "Jackson",
+    "score": 0.8235294222831726
+  },
+  "A. Richardson": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "O. Deman": {
+    "value": 3500000.0,
+    "matched_name": "Deman",
+    "score": 0.7692307829856873
+  },
+  "F. Sjovold": {
+    "value": 10000000.0,
+    "matched_name": "Sjøvold",
+    "score": 0.7058823108673096
+  },
+  "E. Lepaul": {
+    "value": 35000000.0,
+    "matched_name": "Lepaul",
+    "score": 0.800000011920929
+  },
+  "K. Fitz-Jim": {
+    "value": 3000000.0,
+    "matched_name": "Fitz-Jim",
+    "score": 0.8421052694320679
+  },
+  "Roger Hinojo": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Unai Simon": {
+    "value": 22000000.0,
+    "matched_name": "Unai Simón",
+    "score": 0.8999999761581421
+  },
+  "K. Potulski": {
+    "value": 18000000.0,
+    "matched_name": "Potulski",
+    "score": 0.8421052694320679
+  },
+  "Adama Camara": {
+    "value": 3000000.0,
+    "matched_name": "Adama Camara",
+    "score": 1.0
+  },
+  "Mathew Ryan": {
+    "value": 1800000.0,
+    "matched_name": "Mathew Ryan",
+    "score": 1.0
+  },
+  "Marc Aguado": {
+    "value": 3500000.0,
+    "matched_name": "Marc Aguado",
+    "score": 1.0
+  },
+  "Tom Krauss": {
+    "value": 4500000.0,
+    "matched_name": "Tom Krauß",
+    "score": 0.8421052694320679
+  },
+  "Rafa Marin": {
+    "value": 12000000.0,
+    "matched_name": "Rafa Marín",
+    "score": 0.8999999761581421
+  },
+  "O. Bjortuft": {
+    "value": 4500000.0,
+    "matched_name": "Odin Bjørtuft",
+    "score": 0.75
+  },
+  "Javi Hernandez": {
+    "value": 2000000.0,
+    "matched_name": "Javi Hernández",
+    "score": 0.9285714030265808
+  },
+  "Tom Rothe": {
+    "value": 10000000.0,
+    "matched_name": "Tom Rothe",
+    "score": 1.0
+  },
+  "J. Clauss": {
+    "value": 4000000.0,
+    "matched_name": "Clauss",
+    "score": 0.800000011920929
+  },
+  "Merlin Rohl": {
+    "value": 16000000.0,
+    "matched_name": "Merlin Röhl",
+    "score": 0.9090908765792847
+  },
+  "Carlos Dotor": {
+    "value": 2000000.0,
+    "matched_name": "Carlos Dotor",
+    "score": 1.0
+  },
+  "Amos Pieper": {
+    "value": 4000000.0,
+    "matched_name": "Amos Pieper",
+    "score": 1.0
+  },
+  "T. Castagne": {
+    "value": 8000000.0,
+    "matched_name": "Castagne",
+    "score": 0.8421052694320679
+  },
+  "Mert Muldur": {
+    "value": 7000000.0,
+    "matched_name": "Mert Müldür",
+    "score": 0.8181818127632141
+  },
+  "A. Mantilla": {
+    "value": 1200000.0,
+    "matched_name": "Mantilla",
+    "score": 0.8421052694320679
+  },
+  "L. Maronnier": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Cesar Palacios": {
+    "value": 7500000.0,
+    "matched_name": "César Palacios",
+    "score": 0.9285714030265808
+  },
+  "Arnaut Danjuma": {
+    "value": 3000000.0,
+    "matched_name": "Arnaut Danjuma",
+    "score": 1.0
+  },
+  "S. Herrera": {
+    "value": 6500000.0,
+    "matched_name": "Herrera",
+    "score": 0.8235294222831726
+  },
+  "O. Camara": {
+    "value": 40000000.0,
+    "matched_name": "Camara",
+    "score": 0.800000011920929
+  },
+  "E. Pinnock": {
+    "value": 3000000.0,
+    "matched_name": "Pinnock",
+    "score": 0.8235294222831726
+  },
+  "S. Lontani": {
+    "value": 200000.0,
+    "matched_name": "Soltani",
+    "score": 0.7058823108673096
+  },
+  "G. Bernardeau": {
+    "value": 1200000.0,
+    "matched_name": "Bernardeau",
+    "score": 0.8695651888847351
+  },
+  "R. Zentner": {
+    "value": 2500000.0,
+    "matched_name": "Zentner",
+    "score": 0.8235294222831726
+  },
+  "W. Anton": {
+    "value": 18000000.0,
+    "matched_name": "Anton",
+    "score": 0.7692307829856873
+  },
+  "A. Kinsky": {
+    "value": 15000000.0,
+    "matched_name": "Kinský",
+    "score": 0.6666666269302368
+  },
+  "Pepelu": {
+    "value": 8000000.0,
+    "matched_name": "Pepelu",
+    "score": 1.0
+  },
+  "Marco Friedl": {
+    "value": 10000000.0,
+    "matched_name": "Marco Friedl",
+    "score": 1.0
+  },
+  "Savio": {
+    "value": 750000.0,
+    "matched_name": "Salvio",
+    "score": 0.9090908765792847
+  },
+  "Johan Mojica": {
+    "value": 1500000.0,
+    "matched_name": "Johan Mojica",
+    "score": 1.0
+  },
+  "A. Davies": {
+    "value": 200000.0,
+    "matched_name": "Adam Davies",
+    "score": 0.800000011920929
+  },
+  "F. Wirtz": {
+    "value": 100000000.0,
+    "matched_name": "Wirtz",
+    "score": 0.7692307829856873
+  },
+  "Vedat Muriqi": {
+    "value": 4500000.0,
+    "matched_name": "Vedat Muriqi",
+    "score": 1.0
+  },
+  "J. Trafford": {
+    "value": 25000000.0,
+    "matched_name": "Trafford",
+    "score": 0.8421052694320679
+  },
+  "David Zima": {
+    "value": 7000000.0,
+    "matched_name": "David Zima",
+    "score": 1.0
+  },
+  "Milos Kerkez": {
+    "value": 35000000.0,
+    "matched_name": "Milos Kerkez",
+    "score": 1.0
+  },
+  "L. Gunther": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Noah Sadiki": {
+    "value": 35000000.0,
+    "matched_name": "Noah Sadiki",
+    "score": 1.0
+  },
+  "Leo Roman": {
+    "value": 6000000.0,
+    "matched_name": "Leo Román",
+    "score": 0.8888888359069824
+  },
+  "I. Johannesson": {
+    "value": 8000000.0,
+    "matched_name": "Jóhannesson",
+    "score": 0.800000011920929
+  },
+  "N. Tenaglia": {
+    "value": 3000000.0,
+    "matched_name": "Tenaglia",
+    "score": 0.8421052694320679
+  },
+  "J. Greaves": {
+    "value": 16000000.0,
+    "matched_name": "Greaves",
+    "score": 0.8235294222831726
+  },
+  "D. Berardi": {
+    "value": 7000000.0,
+    "matched_name": "Berardi",
+    "score": 0.8235294222831726
+  },
+  "T. Kleindienst": {
+    "value": 8000000.0,
+    "matched_name": "Tim Kleindienst",
+    "score": 0.8965517282485962
+  },
+  "K. Kvaratskhelia": {
+    "value": 140000000.0,
+    "matched_name": "Kvaratskhelia",
+    "score": 0.8965517282485962
+  },
+  "M. van de Ven": {
+    "value": 50000000.0,
+    "matched_name": "van de Ven",
+    "score": 0.8695651888847351
+  },
+  "R. Onyedika": {
+    "value": 23000000.0,
+    "matched_name": "Onyedika",
+    "score": 0.8421052694320679
+  },
+  "Alex Valle": {
+    "value": 12000000.0,
+    "matched_name": "Álex Valle",
+    "score": 0.8999999761581421
+  },
+  "Yan Couto": {
+    "value": 17000000.0,
+    "matched_name": "Yan Couto",
+    "score": 1.0
+  },
+  "M. Ellertsson": {
+    "value": 6000000.0,
+    "matched_name": "Ellertsson",
+    "score": 0.8695651888847351
+  },
+  "Jay Dasilva": {
+    "value": 9000000.0,
+    "matched_name": "Jay Dasilva",
+    "score": 1.0
+  },
+  "J. Gvardiol": {
+    "value": 70000000.0,
+    "matched_name": "Gvardiol",
+    "score": 0.8421052694320679
+  },
+  "Z. El Ouahdi": {
+    "value": 17000000.0,
+    "matched_name": "El Ouahdi",
+    "score": 0.8571428656578064
+  },
+  "Kenny Lala": {
+    "value": 1500000.0,
+    "matched_name": "Kenny Lala",
+    "score": 1.0
+  },
+  "Stefan Posch": {
+    "value": 6000000.0,
+    "matched_name": "Stefan Posch",
+    "score": 1.0
+  },
+  "Matt Grimes": {
+    "value": 7000000.0,
+    "matched_name": "Matt Grimes",
+    "score": 1.0
+  },
+  "V. Janelt": {
+    "value": 16000000.0,
+    "matched_name": "Janelt",
+    "score": 0.800000011920929
+  },
+  "S. Pavlovic": {
+    "value": 90000000.0,
+    "matched_name": "Pavlovic",
+    "score": 0.8421052694320679
+  },
+  "R. Fellhauer": {
+    "value": 3500000.0,
+    "matched_name": "Fellhauer",
+    "score": 0.8571428656578064
+  },
+  "A. Ismajli": {
+    "value": 5000000.0,
+    "matched_name": "Ismajli",
+    "score": 0.8235294222831726
+  },
+  "Nadiem Amiri": {
+    "value": 17000000.0,
+    "matched_name": "Nadiem Amiri",
+    "score": 1.0
+  },
+  "O. Edouard": {
+    "value": 750000.0,
+    "matched_name": "Eduardo",
+    "score": 0.7058823108673096
+  },
+  "Goncalo Ramos": {
+    "value": 30000000.0,
+    "matched_name": "Gonçalo Ramos",
+    "score": 0.9230769276618958
+  },
+  "E. Valeri": {
+    "value": 3000000.0,
+    "matched_name": "Valeri",
+    "score": 0.800000011920929
+  },
+  "X. Mandza": {
+    "value": 8000000.0,
+    "matched_name": "Mandas",
+    "score": 0.6666666269302368
+  },
+  "Tyrone Mings": {
+    "value": 3000000.0,
+    "matched_name": "Tyrone Mings",
+    "score": 1.0
+  },
+  "Y. Fofana": {
+    "value": 150000.0,
+    "matched_name": "Yaya Fofana",
+    "score": 0.800000011920929
+  },
+  "D. Ballard": {
+    "value": 20000000.0,
+    "matched_name": "Dan Ballard",
+    "score": 0.8571428656578064
+  },
+  "D. Heuer Fernandes": {
+    "value": 1200000.0,
+    "matched_name": "Heuer Fernandes",
+    "score": 0.9090908765792847
+  },
+  "S. Lammens": {
+    "value": 35000000.0,
+    "matched_name": "Lammens",
+    "score": 0.8235294222831726
+  },
+  "Y. Tielemans": {
+    "value": 30000000.0,
+    "matched_name": "Tielemans",
+    "score": 0.8571428656578064
+  },
+  "O. Ocheretko": {
+    "value": 7000000.0,
+    "matched_name": "Ocheretko",
+    "score": 0.8571428656578064
+  },
+  "B. Silva": {
+    "value": 25000000.0,
+    "matched_name": "Silva",
+    "score": 0.7692307829856873
+  },
+  "P. Lienhart": {
+    "value": 10000000.0,
+    "matched_name": "Lienhart",
+    "score": 0.8421052694320679
+  },
+  "L. Samardzic": {
+    "value": 100000.0,
+    "matched_name": "Samardzic",
+    "score": 0.8571428656578064
+  },
+  "Fabio Gruber": {
+    "value": 3000000.0,
+    "matched_name": "Fabio Gruber",
+    "score": 1.0
+  },
+  "J. Ryerson": {
+    "value": 25000000.0,
+    "matched_name": "Ryerson",
+    "score": 0.8235294222831726
+  },
+  "K. Gaspar": {
+    "value": 3000000.0,
+    "matched_name": "Gaspar",
+    "score": 0.800000011920929
+  },
+  "Nico Williams": {
+    "value": 40000000.0,
+    "matched_name": "Nico Williams",
+    "score": 1.0
+  },
+  "M. Ginter": {
+    "value": 5000000.0,
+    "matched_name": "Ginter",
+    "score": 0.800000011920929
+  },
+  "Vinicius Tobias": {
+    "value": 6000000.0,
+    "matched_name": "Vinícius Tobias",
+    "score": 0.9333333373069763
+  },
+  "Brice Samba": {
+    "value": 7000000.0,
+    "matched_name": "Brice Samba",
+    "score": 1.0
+  },
+  "D. Malen": {
+    "value": 45000000.0,
+    "matched_name": "Malen",
+    "score": 0.7692307829856873
+  },
+  "Willi Orban": {
+    "value": 5000000.0,
+    "matched_name": "Willi Orbán",
+    "score": 0.9090908765792847
+  },
+  "C. Harder": {
+    "value": 17000000.0,
+    "matched_name": "Harder",
+    "score": 0.800000011920929
+  },
+  "F. Bernardeschi": {
+    "value": 3500000.0,
+    "matched_name": "Bernardeschi",
+    "score": 0.8888888359069824
+  },
+  "J. Quansah": {
+    "value": 45000000.0,
+    "matched_name": "Quansah",
+    "score": 0.8235294222831726
+  },
+  "Leny Yoro": {
+    "value": 50000000.0,
+    "matched_name": "Leny Yoro",
+    "score": 1.0
+  },
+  "A. Gallo": {
+    "value": 3500000.0,
+    "matched_name": "Gallo",
+    "score": 0.7692307829856873
+  },
+  "Eddy Kouadio": {
+    "value": 2500000.0,
+    "matched_name": "Eddy Kouadio",
+    "score": 1.0
+  },
+  "B. Barcola": {
+    "value": 70000000.0,
+    "matched_name": "Barcola",
+    "score": 0.8235294222831726
+  },
+  "Regan Slater": {
+    "value": 3500000.0,
+    "matched_name": "Regan Slater",
+    "score": 1.0
+  },
+  "Juan Iglesias": {
+    "value": 5000000.0,
+    "matched_name": "Juan Iglesias",
+    "score": 1.0
+  },
+  "Reinildo": {
+    "value": 350000.0,
+    "matched_name": "Reinaldo",
+    "score": 0.875
+  },
+  "Mario Gila": {
+    "value": 30000000.0,
+    "matched_name": "Mario Gila",
+    "score": 1.0
+  },
+  "M. Lewis-Skelly": {
+    "value": 45000000.0,
+    "matched_name": "Lewis-Skelly",
+    "score": 0.8888888359069824
+  },
+  "A. Pedrosa": {
+    "value": 2800000.0,
+    "matched_name": "Pedrosa",
+    "score": 0.8235294222831726
+  },
+  "M. Niflore": {
+    "value": 1000000.0,
+    "matched_name": "Niflore",
+    "score": 0.8235294222831726
+  },
+  "Joane Gadou": {
+    "value": 20000000.0,
+    "matched_name": "Joane Gadou",
+    "score": 1.0
+  },
+  "A. Bulatovic": {
+    "value": 8000000.0,
+    "matched_name": "Bulatovic",
+    "score": 0.8571428656578064
+  },
+  "Joseph Kalulu": {
+    "value": 9000000.0,
+    "matched_name": "Joseph Okumu",
+    "score": 0.7200000286102295
+  },
+  "A. Hajdari": {
+    "value": 25000000.0,
+    "matched_name": "Hajdari",
+    "score": 0.8235294222831726
+  },
+  "Ko Itakura": {
+    "value": 8000000.0,
+    "matched_name": "Ko Itakura",
+    "score": 1.0
+  },
+  "T. Jorgensen": {
+    "value": 15000000.0,
+    "matched_name": "Jørgensen",
+    "score": 0.761904776096344
+  },
+  "J. Strand Larsen": {
+    "value": 40000000.0,
+    "matched_name": "Jørgen Strand Larsen",
+    "score": 0.8333333730697632
+  },
+  "Joan Garcia": {
+    "value": 45000000.0,
+    "matched_name": "Joan García",
+    "score": 0.9090908765792847
+  },
+  "N. Fullkrug": {
+    "value": 3500000.0,
+    "matched_name": "Füllkrug",
+    "score": 0.7368420958518982
+  },
+  "Oihan Sancet": {
+    "value": 25000000.0,
+    "matched_name": "Oihan Sancet",
+    "score": 1.0
+  },
+  "Arda Guler": {
+    "value": 90000000.0,
+    "matched_name": "Arda Güler",
+    "score": 0.8999999761581421
+  },
+  "P. Lees-Melou": {
+    "value": 4500000.0,
+    "matched_name": "Lees-Melou",
+    "score": 0.8695651888847351
+  },
+  "M. Hansen": {
+    "value": 500000.0,
+    "matched_name": "Mads Hansen",
+    "score": 0.800000011920929
+  },
+  "Xavi Espart": {
+    "value": 5000000.0,
+    "matched_name": "Xavi Espart",
+    "score": 1.0
+  },
+  "Natan": {
+    "value": 25000000.0,
+    "matched_name": "Natan",
+    "score": 1.0
+  },
+  "S. Canales": {
+    "value": 3000000.0,
+    "matched_name": "Canales",
+    "score": 0.8235294222831726
+  },
+  "N. Gonzalez": {
+    "value": 2500000.0,
+    "matched_name": "Gonzalez",
+    "score": 0.8421052694320679
+  },
+  "A. Stiller": {
+    "value": 45000000.0,
+    "matched_name": "Stiller",
+    "score": 0.8235294222831726
+  },
+  "P. Dorgu": {
+    "value": 35000000.0,
+    "matched_name": "Dorgu",
+    "score": 0.7692307829856873
+  },
+  "I. Matanovic": {
+    "value": 22000000.0,
+    "matched_name": "Matanovic",
+    "score": 0.8571428656578064
+  },
+  "Desire Doue": {
+    "value": 120000000.0,
+    "matched_name": "Désiré Doué",
+    "score": 0.7272727489471436
+  },
+  "Joe Willock": {
+    "value": 14000000.0,
+    "matched_name": "Joe Willock",
+    "score": 1.0
+  },
+  "Danilo Veiga": {
+    "value": 2500000.0,
+    "matched_name": "Danilo Veiga",
+    "score": 1.0
+  },
+  "Kevin Danois": {
+    "value": 20000000.0,
+    "matched_name": "Kévin Danois",
+    "score": 0.9166666269302368
+  },
+  "Kenneth Taylor": {
+    "value": 25000000.0,
+    "matched_name": "Kenneth Taylor",
+    "score": 1.0
+  },
+  "F. Bjorkan": {
+    "value": 3500000.0,
+    "matched_name": "Bjørkan",
+    "score": 0.7058823108673096
+  },
+  "Fran Garcia": {
+    "value": 10000000.0,
+    "matched_name": "Fran García",
+    "score": 0.9090908765792847
+  },
+  "M. Greenwood": {
+    "value": 55000000.0,
+    "matched_name": "Greenwood",
+    "score": 0.8571428656578064
+  },
+  "A. Hakimi": {
+    "value": 80000000.0,
+    "matched_name": "Hakimi",
+    "score": 0.800000011920929
+  },
+  "G. Moscardo": {
+    "value": 7000000.0,
+    "matched_name": "Moscardo",
+    "score": 0.8421052694320679
+  },
+  "A. Marcandalli": {
+    "value": 14000000.0,
+    "matched_name": "Marcandalli",
+    "score": 0.8799999952316284
+  },
+  "V. Bondar": {
+    "value": 8000000.0,
+    "matched_name": "Bondar",
+    "score": 0.800000011920929
+  },
+  "E. Palacios": {
+    "value": 25000000.0,
+    "matched_name": "Palacios",
+    "score": 0.8421052694320679
+  },
+  "E. Nwaneri": {
+    "value": 35000000.0,
+    "matched_name": "Nwaneri",
+    "score": 0.8235294222831726
+  },
+  "J. Juranovic": {
+    "value": 2000000.0,
+    "matched_name": "Juranovic",
+    "score": 0.8571428656578064
+  },
+  "V. Coufal": {
+    "value": 2500000.0,
+    "matched_name": "Coufal",
+    "score": 0.800000011920929
+  },
+  "A. Elanga": {
+    "value": 32000000.0,
+    "matched_name": "Elanga",
+    "score": 0.800000011920929
+  },
+  "N. Cambiaghi": {
+    "value": 14000000.0,
+    "matched_name": "Cambiaghi",
+    "score": 0.8571428656578064
+  },
+  "D. Calvert-Lewin": {
+    "value": 22000000.0,
+    "matched_name": "Calvert-Lewin",
+    "score": 0.8965517282485962
+  },
+  "Vitinha": {
+    "value": 140000000.0,
+    "matched_name": "Vitinha",
+    "score": 1.0
+  },
+  "Sadibou Sane": {
+    "value": 7000000.0,
+    "matched_name": "Sadibou Sané",
+    "score": 0.9166666269302368
+  },
+  "D. Svensson": {
+    "value": 22000000.0,
+    "matched_name": "Svensson",
+    "score": 0.8421052694320679
+  },
+  "B. Gilmour": {
+    "value": 20000000.0,
+    "matched_name": "Gilmour",
+    "score": 0.8235294222831726
+  },
+  "Mamadou Sarr": {
+    "value": 22000000.0,
+    "matched_name": "Mamadou Sarr",
+    "score": 1.0
+  },
+  "Robin Roefs": {
+    "value": 28000000.0,
+    "matched_name": "Robin Roefs",
+    "score": 1.0
+  },
+  "A. Carboni": {
+    "value": 7500000.0,
+    "matched_name": "Carboni",
+    "score": 0.8235294222831726
+  },
+  "K. Dewsbury-Hall": {
+    "value": 35000000.0,
+    "matched_name": "Dewsbury-Hall",
+    "score": 0.8965517282485962
+  },
+  "M. Belloumi": {
+    "value": 4000000.0,
+    "matched_name": "Belloumi",
+    "score": 0.8421052694320679
+  },
+  "Luke Shaw": {
+    "value": 8000000.0,
+    "matched_name": "Luke Shaw",
+    "score": 1.0
+  },
+  "A. Vossah": {
+    "value": 15000000.0,
+    "matched_name": "Vossah",
+    "score": 0.800000011920929
+  },
+  "S. Nanasi": {
+    "value": 15000000.0,
+    "matched_name": "Nanasi",
+    "score": 0.800000011920929
+  },
+  "R. Perraud": {
+    "value": 7000000.0,
+    "matched_name": "Perraud",
+    "score": 0.8235294222831726
+  },
+  "Juan Rodriguez": {
+    "value": 10000000.0,
+    "matched_name": "Juan Rodríguez",
+    "score": 0.9285714030265808
+  },
+  "J. Markovic": {
+    "value": 3500000.0,
+    "matched_name": "Markovic",
+    "score": 0.8421052694320679
+  },
+  "D. Riznyk": {
+    "value": 8000000.0,
+    "matched_name": "Riznyk",
+    "score": 0.800000011920929
+  },
+  "Aleix Garcia": {
+    "value": 20000000.0,
+    "matched_name": "Aleix García",
+    "score": 0.9166666269302368
+  },
+  "Junior Diaz": {
+    "value": 6000000.0,
+    "matched_name": "Junior Diaz",
+    "score": 1.0
+  },
+  "Pedro Neto": {
+    "value": 60000000.0,
+    "matched_name": "Pedro Neto",
+    "score": 1.0
+  },
+  "Ritsu Doan": {
+    "value": 17000000.0,
+    "matched_name": "Ritsu Doan",
+    "score": 1.0
+  },
+  "Bryan Mbeumo": {
+    "value": 75000000.0,
+    "matched_name": "Bryan Mbeumo",
+    "score": 1.0
+  },
+  "C. Ejuke": {
+    "value": 4000000.0,
+    "matched_name": "Ejuke",
+    "score": 0.7692307829856873
+  },
+  "Alvaro Carreras": {
+    "value": 50000000.0,
+    "matched_name": "Álvaro Carreras",
+    "score": 0.9333333373069763
+  },
+  "D. Mota Carvalho": {
+    "value": 300000.0,
+    "matched_name": "Matis Carvalho",
+    "score": 0.7333333492279053
+  },
+  "V. van Dijk": {
+    "value": 15000000.0,
+    "matched_name": "van Dijk",
+    "score": 0.8421052694320679
+  },
+  "G. Scamacca": {
+    "value": 25000000.0,
+    "matched_name": "Scamacca",
+    "score": 0.8421052694320679
+  },
+  "E. Akinsanmiro": {
+    "value": 7000000.0,
+    "matched_name": "Akinsanmiro",
+    "score": 0.8799999952316284
+  },
+  "M. Skoras": {
+    "value": 4000000.0,
+    "matched_name": "Skoras",
+    "score": 0.800000011920929
+  },
+  "A. Golovin": {
+    "value": 18000000.0,
+    "matched_name": "Golovin",
+    "score": 0.8235294222831726
+  },
+  "H. Hackney": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Abdul Fatawu": {
+    "value": 20000000.0,
+    "matched_name": "Abdul Fatawu",
+    "score": 1.0
+  },
+  "Tidiam Gomis": {
+    "value": 5000000.0,
+    "matched_name": "Tidiam Gomis",
+    "score": 1.0
+  },
+  "M. Politano": {
+    "value": 5000000.0,
+    "matched_name": "Politano",
+    "score": 0.8421052694320679
+  },
+  "J. Bakayoko": {
+    "value": 20000000.0,
+    "matched_name": "Bakayoko",
+    "score": 0.8421052694320679
+  },
+  "Enzo Bardeli": {
+    "value": 800000.0,
+    "matched_name": "Enzo Basilio",
+    "score": 0.75
+  },
+  "Mariano": {
+    "value": 300000.0,
+    "matched_name": "Mariano",
+    "score": 1.0
+  },
+  "C. Starfelt": {
+    "value": 4500000.0,
+    "matched_name": "Starfelt",
+    "score": 0.8421052694320679
+  },
+  "Paul Wanner": {
+    "value": 22000000.0,
+    "matched_name": "Paul Wanner",
+    "score": 1.0
+  },
+  "A. Bastoni": {
+    "value": 65000000.0,
+    "matched_name": "Bastoni",
+    "score": 0.8235294222831726
+  },
+  "Egil Selvik": {
+    "value": 1500000.0,
+    "matched_name": "Egil Selvik",
+    "score": 1.0
+  },
+  "E. Latte Lath": {
+    "value": 10000000.0,
+    "matched_name": "Latte Lath",
+    "score": 0.8695651888847351
+  },
+  "M. Eggestein": {
+    "value": 10000000.0,
+    "matched_name": "Eggestein",
+    "score": 0.8571428656578064
+  },
+  "M. Diop": {
+    "value": 15000000.0,
+    "matched_name": "Diop",
+    "score": 0.7272727489471436
+  },
+  "P. Gulacsi": {
+    "value": 1000000.0,
+    "matched_name": "Gulácsi",
+    "score": 0.7058823108673096
+  },
+  "Evan N'Dicka": {
+    "value": 35000000.0,
+    "matched_name": "Evan Ndicka",
+    "score": 0.8695651888847351
+  },
+  "Robin Gosens": {
+    "value": 4000000.0,
+    "matched_name": "Robin Gosens",
+    "score": 1.0
+  },
+  "J. Pickford": {
+    "value": 13000000.0,
+    "matched_name": "Pickford",
+    "score": 0.8421052694320679
+  },
+  "Declan Rice": {
+    "value": 120000000.0,
+    "matched_name": "Declan Rice",
+    "score": 1.0
+  },
+  "Tim Lemperle": {
+    "value": 17000000.0,
+    "matched_name": "Tim Lemperle",
+    "score": 1.0
+  },
+  "Sondre Fet": {
+    "value": 700000.0,
+    "matched_name": "Sondre Liseth",
+    "score": 0.7826087474822998
+  },
+  "Ville Koski": {
+    "value": 1500000.0,
+    "matched_name": "Ville Koski",
+    "score": 1.0
+  },
+  "G. Valera": {
+    "value": 6000000.0,
+    "matched_name": "Valera",
+    "score": 0.800000011920929
+  },
+  "Lucas Noubi": {
+    "value": 3000000.0,
+    "matched_name": "Lucas Noubi",
+    "score": 1.0
+  },
+  "Robin Risser": {
+    "value": 30000000.0,
+    "matched_name": "Robin Risser",
+    "score": 1.0
+  },
+  "J. Russell-Rowe": {
+    "value": 3000000.0,
+    "matched_name": "Russell-Rowe",
+    "score": 0.8888888359069824
+  },
+  "S. Chukwueze": {
+    "value": 18000000.0,
+    "matched_name": "Chukwueze",
+    "score": 0.8571428656578064
+  },
+  "B. Sesko": {
+    "value": 75000000.0,
+    "matched_name": "Sesko",
+    "score": 0.7692307829856873
+  },
+  "David Raya": {
+    "value": 30000000.0,
+    "matched_name": "David Raya",
+    "score": 1.0
+  },
+  "N. Remberg": {
+    "value": 9000000.0,
+    "matched_name": "Remberg",
+    "score": 0.8235294222831726
+  },
+  "Jhon Lucumi": {
+    "value": 22000000.0,
+    "matched_name": "Jhon Lucumí",
+    "score": 0.9090908765792847
+  },
+  "C. Nwachukwu": {
+    "value": 150000.0,
+    "matched_name": "Nwachukwu",
+    "score": 0.8571428656578064
+  },
+  "Paulo Dybala": {
+    "value": 5000000.0,
+    "matched_name": "Paulo Dybala",
+    "score": 1.0
+  },
+  "V. Sasso": {
+    "value": 200000.0,
+    "matched_name": "Sasso",
+    "score": 0.7692307829856873
+  },
+  "C. Tolisso": {
+    "value": 10000000.0,
+    "matched_name": "Tolisso",
+    "score": 0.8235294222831726
+  },
+  "I. Yuksek": {
+    "value": 15000000.0,
+    "matched_name": "Yüksek",
+    "score": 0.6666666269302368
+  },
+  "Benat Turrientes": {
+    "value": 10000000.0,
+    "matched_name": "Beñat Turrientes",
+    "score": 0.9375
+  },
+  "Evanilson": {
+    "value": 35000000.0,
+    "matched_name": "Evanilson",
+    "score": 1.0
+  },
+  "M. Gregoritsch": {
+    "value": 1500000.0,
+    "matched_name": "Gregoritsch",
+    "score": 0.8799999952316284
+  },
+  "Noah Mbamba": {
+    "value": 2000000.0,
+    "matched_name": "Noah Mbamba",
+    "score": 1.0
+  },
+  "Berke Ozer": {
+    "value": 10000000.0,
+    "matched_name": "Berke Özer",
+    "score": 0.8999999761581421
+  },
+  "G. Kvernadze": {
+    "value": 4000000.0,
+    "matched_name": "Kvernadze",
+    "score": 0.8571428656578064
+  },
+  "Bartug Elmaz": {
+    "value": 1500000.0,
+    "matched_name": "Bartuğ Elmaz",
+    "score": 0.9166666269302368
+  },
+  "Alisson Santana": {
+    "value": 28000000.0,
+    "matched_name": "Alisson Santos",
+    "score": 0.8275862336158752
+  },
+  "D. Coulibaly": {
+    "value": 28000000.0,
+    "matched_name": "Coulibaly",
+    "score": 0.8571428656578064
+  },
+  "O. Oskarsson": {
+    "value": 20000000.0,
+    "matched_name": "Orri Óskarsson",
+    "score": 0.7692307829856873
+  },
+  "Ruiz de Galarreta": {
+    "value": 2000000.0,
+    "matched_name": "Ruiz de Galarreta",
+    "score": 1.0
+  },
+  "Alex Iwobi": {
+    "value": 20000000.0,
+    "matched_name": "Alex Iwobi",
+    "score": 1.0
+  },
+  "Wiktor Nowak": {
+    "value": 1500000.0,
+    "matched_name": "Wiktor Nowak",
+    "score": 1.0
+  },
+  "C. Brackelmann": {
+    "value": 50000.0,
+    "matched_name": "Backmann",
+    "score": 0.7272727489471436
+  },
+  "G. Yassine": {
+    "value": 12000000.0,
+    "matched_name": "Yassine",
+    "score": 0.8235294222831726
+  },
+  "Ryan Giles": {
+    "value": 4500000.0,
+    "matched_name": "Ryan Giles",
+    "score": 1.0
+  },
+  "R. Navarro": {
+    "value": 15000000.0,
+    "matched_name": "Navarro",
+    "score": 0.8235294222831726
+  },
+  "J. Makengo": {
+    "value": 6000000.0,
+    "matched_name": "Makengo",
+    "score": 0.8235294222831726
+  },
+  "Remy Labeau": {
+    "value": 500000.0,
+    "matched_name": "Labeau",
+    "score": 0.7058823108673096
+  },
+  "R. Halhal": {
+    "value": 5000000.0,
+    "matched_name": "Halhal",
+    "score": 0.800000011920929
+  },
+  "Guus Til": {
+    "value": 15000000.0,
+    "matched_name": "Guus Til",
+    "score": 1.0
+  },
+  "R. Mangas": {
+    "value": 2000000.0,
+    "matched_name": "Mangas",
+    "score": 0.800000011920929
+  },
+  "Vinicius Junior": {
+    "value": 140000000.0,
+    "matched_name": "Vinicius Junior",
+    "score": 1.0
+  },
+  "Pathe Mboup": {
+    "value": 2500000.0,
+    "matched_name": "Pathé Mboup",
+    "score": 0.9090908765792847
+  },
+  "F. Lejeune": {
+    "value": 1800000.0,
+    "matched_name": "Lejeune",
+    "score": 0.8235294222831726
+  },
+  "Sergino Dest": {
+    "value": 18000000.0,
+    "matched_name": "Sergiño Dest",
+    "score": 0.9166666269302368
+  },
+  "Ruben Dias": {
+    "value": 55000000.0,
+    "matched_name": "Rúben Dias",
+    "score": 0.8999999761581421
+  },
+  "G. Mensah": {
+    "value": 4000000.0,
+    "matched_name": "Mensah",
+    "score": 0.800000011920929
+  },
+  "Noah Atubolu": {
+    "value": 25000000.0,
+    "matched_name": "Noah Atubolu",
+    "score": 1.0
+  },
+  "S. Auklend": {
+    "value": 3000000.0,
+    "matched_name": "Auklend",
+    "score": 0.8235294222831726
+  },
+  "K. Doumbia": {
+    "value": 9000000.0,
+    "matched_name": "Doumbia",
+    "score": 0.8235294222831726
+  },
+  "Joao Neves": {
+    "value": 140000000.0,
+    "matched_name": "João Neves",
+    "score": 0.8999999761581421
+  },
+  "K. Mbappe": {
+    "value": 180000000.0,
+    "matched_name": "Mbappé",
+    "score": 0.6666666269302368
+  },
+  "A. Saelemaekers": {
+    "value": 20000000.0,
+    "matched_name": "Saelemaekers",
+    "score": 0.8888888359069824
+  },
+  "N. El Aynaoui": {
+    "value": 23000000.0,
+    "matched_name": "El Aynaoui",
+    "score": 0.8695651888847351
+  },
+  "M. Pellegrino": {
+    "value": 15000000.0,
+    "matched_name": "Pellegrino",
+    "score": 0.8695651888847351
+  },
+  "M. Hjulmand": {
+    "value": 45000000.0,
+    "matched_name": "Hjulmand",
+    "score": 0.8421052694320679
+  },
+  "C. Rushworth": {
+    "value": 16000000.0,
+    "matched_name": "Rushworth",
+    "score": 0.8571428656578064
+  },
+  "A. Amenda": {
+    "value": 10000000.0,
+    "matched_name": "Amenda",
+    "score": 0.800000011920929
+  },
+  "R. Dragusin": {
+    "value": 300000.0,
+    "matched_name": "Dragun",
+    "score": 0.7058823108673096
+  },
+  "P. Katseris": {
+    "value": 2000000.0,
+    "matched_name": "Katseris",
+    "score": 0.8421052694320679
+  },
+  "Miguel Roman": {
+    "value": 15000000.0,
+    "matched_name": "Miguel Román",
+    "score": 0.9166666269302368
+  },
+  "Kaua Elias": {
+    "value": 15000000.0,
+    "matched_name": "Kauã Elias",
+    "score": 0.8999999761581421
+  },
+  "G. Scalvini": {
+    "value": 38000000.0,
+    "matched_name": "Scalvini",
+    "score": 0.8421052694320679
+  },
+  "A. Kemlein": {
+    "value": 12000000.0,
+    "matched_name": "Kemlein",
+    "score": 0.8235294222831726
+  },
+  "F. Ronnow": {
+    "value": 2000000.0,
+    "matched_name": "Rönnow",
+    "score": 0.6666666269302368
+  },
+  "N. Brown": {
+    "value": 40000000.0,
+    "matched_name": "Brown",
+    "score": 0.7692307829856873
+  },
+  "Fedde Leysen": {
+    "value": 3500000.0,
+    "matched_name": "Fedde Leysen",
+    "score": 1.0
+  },
+  "A. Grimaldo": {
+    "value": 20000000.0,
+    "matched_name": "Grimaldo",
+    "score": 0.8421052694320679
+  },
+  "Chupe": {
+    "value": 350000.0,
+    "matched_name": "Chuev",
+    "score": 0.800000011920929
+  },
+  "P. Aubameyang": {
+    "value": 2500000.0,
+    "matched_name": "Aubameyang",
+    "score": 0.8695651888847351
+  },
+  "F. Honorat": {
+    "value": 7000000.0,
+    "matched_name": "Honorat",
+    "score": 0.8235294222831726
+  },
+  "L. Geertruida": {
+    "value": 20000000.0,
+    "matched_name": "Geertruida",
+    "score": 0.8695651888847351
+  },
+  "C. Archer": {
+    "value": 10000000.0,
+    "matched_name": "Archer",
+    "score": 0.800000011920929
+  },
+  "Noah Cadiou": {
+    "value": 3000000.0,
+    "matched_name": "Noah Cadiou",
+    "score": 1.0
+  },
+  "Nobel Mendy": {
+    "value": 7500000.0,
+    "matched_name": "Nobel Mendy",
+    "score": 1.0
+  },
+  "Pascal Gross": {
+    "value": 2500000.0,
+    "matched_name": "Pascal Groß",
+    "score": 0.8695651888847351
+  },
+  "F. Conceicao": {
+    "value": 30000000.0,
+    "matched_name": "Conceição",
+    "score": 0.6666666269302368
+  },
+  "Kike Perez": {
+    "value": 2200000.0,
+    "matched_name": "Kike Pérez",
+    "score": 0.8999999761581421
+  },
+  "Y. Berchiche": {
+    "value": 1000000.0,
+    "matched_name": "Berchiche",
+    "score": 0.8571428656578064
+  },
+  "S. Castaneda": {
+    "value": 6000000.0,
+    "matched_name": "Castañeda",
+    "score": 0.761904776096344
+  },
+  "David Mokwa": {
+    "value": 1000000.0,
+    "matched_name": "David Mokwa",
+    "score": 1.0
+  },
+  "Elia Caprile": {
+    "value": 15000000.0,
+    "matched_name": "Elia Caprile",
+    "score": 1.0
+  },
+  "Ezri Konsa": {
+    "value": 40000000.0,
+    "matched_name": "Ezri Konsa",
+    "score": 1.0
+  },
+  "Nikola Katic": {
+    "value": 1800000.0,
+    "matched_name": "Nikola Katic",
+    "score": 1.0
+  },
+  "E. Tapsoba": {
+    "value": 35000000.0,
+    "matched_name": "Tapsoba",
+    "score": 0.8235294222831726
+  },
+  "Angel Gomes": {
+    "value": 10000000.0,
+    "matched_name": "Angel Gomes",
+    "score": 1.0
+  },
+  "Jens Odgaard": {
+    "value": 12000000.0,
+    "matched_name": "Jens Odgaard",
+    "score": 1.0
+  },
+  "John McGinn": {
+    "value": 13000000.0,
+    "matched_name": "John McGinn",
+    "score": 1.0
+  },
+  "Dame Gueye": {
+    "value": 200000.0,
+    "matched_name": "Lamine Gueye",
+    "score": 0.8181818127632141
+  },
+  "Unai Gomez": {
+    "value": 5000000.0,
+    "matched_name": "Unai Gómez",
+    "score": 0.8999999761581421
+  },
+  "Renato Veiga": {
+    "value": 25000000.0,
+    "matched_name": "Renato Veiga",
+    "score": 1.0
+  },
+  "Mathys Tel": {
+    "value": 22000000.0,
+    "matched_name": "Mathys Tel",
+    "score": 1.0
+  },
+  "C. Mandas": {
+    "value": 8000000.0,
+    "matched_name": "Mandas",
+    "score": 0.800000011920929
+  },
+  "L. Agoume": {
+    "value": 15000000.0,
+    "matched_name": "Agoumé",
+    "score": 0.6666666269302368
+  },
+  "Nathan Ngoy": {
+    "value": 25000000.0,
+    "matched_name": "Nathan Ngoy",
+    "score": 1.0
+  },
+  "Oriol Rey": {
+    "value": 1800000.0,
+    "matched_name": "Oriol Rey",
+    "score": 1.0
+  },
+  "Aissa Mandi": {
+    "value": 1000000.0,
+    "matched_name": "Aïssa Mandi",
+    "score": 0.9090908765792847
+  },
+  "K. Tzolakis": {
+    "value": 18000000.0,
+    "matched_name": "Tzolakis",
+    "score": 0.8421052694320679
+  },
+  "James Justin": {
+    "value": 12000000.0,
+    "matched_name": "James Justin",
+    "score": 1.0
+  },
+  "Andrey Santos": {
+    "value": 40000000.0,
+    "matched_name": "Andrey Santos",
+    "score": 1.0
+  },
+  "S. Lobotka": {
+    "value": 10000000.0,
+    "matched_name": "Lobotka",
+    "score": 0.8235294222831726
+  },
+  "Zeki Celik": {
+    "value": 14000000.0,
+    "matched_name": "Zeki Çelik",
+    "score": 0.8999999761581421
+  },
+  "Elias Baum": {
+    "value": 4000000.0,
+    "matched_name": "Elias Baum",
+    "score": 1.0
+  },
+  "Rani Khedira": {
+    "value": 2000000.0,
+    "matched_name": "Rani Khedira",
+    "score": 1.0
+  },
+  "Manu Kone": {
+    "value": 50000000.0,
+    "matched_name": "Manu Koné",
+    "score": 0.8888888359069824
+  },
+  "W. Fofana": {
+    "value": 30000000.0,
+    "matched_name": "Fofana",
+    "score": 0.800000011920929
+  },
+  "P. Sander": {
+    "value": 4000000.0,
+    "matched_name": "Sander",
+    "score": 0.800000011920929
+  },
+  "M. Frendrup": {
+    "value": 15000000.0,
+    "matched_name": "Frendrup",
+    "score": 0.8421052694320679
+  },
+  "Laurin Curda": {
+    "value": 25000.0,
+    "matched_name": "Lucian Burdujan",
+    "score": 0.6666666269302368
+  },
+  "M. Esteve": {
+    "value": 6000000.0,
+    "matched_name": "Esteves",
+    "score": 0.75
+  },
+  "L. Ulrich": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Hugo Gonzalez": {
+    "value": 350000.0,
+    "matched_name": "Hugo González",
+    "score": 0.9230769276618958
+  },
+  "C. Casseres": {
+    "value": 2500000.0,
+    "matched_name": "Cáseres",
+    "score": 0.6666666269302368
+  },
+  "J. Kimmich": {
+    "value": 35000000.0,
+    "matched_name": "Kimmich",
+    "score": 0.8235294222831726
+  },
+  "T. Scheller": {
+    "value": 125000.0,
+    "matched_name": "Schneller",
+    "score": 0.800000011920929
+  },
+  "Harry Kane": {
+    "value": 60000000.0,
+    "matched_name": "Harry Kane",
+    "score": 1.0
+  },
+  "E. Skhiri": {
+    "value": 5000000.0,
+    "matched_name": "Skhiri",
+    "score": 0.800000011920929
+  },
+  "T. Heggem": {
+    "value": 13000000.0,
+    "matched_name": "Heggem",
+    "score": 0.800000011920929
+  },
+  "B. Locko": {
+    "value": 6000000.0,
+    "matched_name": "Locko",
+    "score": 0.7692307829856873
+  },
+  "Finn Jeltsch": {
+    "value": 35000000.0,
+    "matched_name": "Finn Jeltsch",
+    "score": 1.0
+  },
+  "Dara O'Shea": {
+    "value": 16000000.0,
+    "matched_name": "Dara O'Shea",
+    "score": 1.0
+  },
+  "D. Pejcinovic": {
+    "value": 15000000.0,
+    "matched_name": "Pejcinovic",
+    "score": 0.8695651888847351
+  },
+  "Carles Alena": {
+    "value": 3000000.0,
+    "matched_name": "Carles Aleñá",
+    "score": 0.8333333730697632
+  },
+  "J. Allevinah": {
+    "value": 1000000.0,
+    "matched_name": "Jim Allevinah",
+    "score": 0.8799999952316284
+  },
+  "D. Petrovic": {
+    "value": 28000000.0,
+    "matched_name": "Petrovic",
+    "score": 0.8421052694320679
+  },
+  "Alex Freeman": {
+    "value": 3500000.0,
+    "matched_name": "Alex Freeman",
+    "score": 1.0
+  },
+  "Liam Delap": {
+    "value": 28000000.0,
+    "matched_name": "Liam Delap",
+    "score": 1.0
+  },
+  "Hugo Bolin": {
+    "value": 6000000.0,
+    "matched_name": "Hugo Bolin",
+    "score": 1.0
+  },
+  "J. Simpson-Pusey": {
+    "value": 9000000.0,
+    "matched_name": "Simpson-Pusey",
+    "score": 0.8965517282485962
+  },
+  "Marlon Gomes": {
+    "value": 12000000.0,
+    "matched_name": "Marlon Gomes",
+    "score": 1.0
+  },
+  "Ante Budimir": {
+    "value": 2800000.0,
+    "matched_name": "Ante Budimir",
+    "score": 1.0
+  },
+  "Pau Cubarsi": {
+    "value": 80000000.0,
+    "matched_name": "Pau Cubarsí",
+    "score": 0.9090908765792847
+  },
+  "Maxime Lopez": {
+    "value": 5000000.0,
+    "matched_name": "Maxime Lopez",
+    "score": 1.0
+  },
+  "Ao Tanaka": {
+    "value": 13000000.0,
+    "matched_name": "Ao Tanaka",
+    "score": 1.0
+  },
+  "M. Sadilek": {
+    "value": 1500000.0,
+    "matched_name": "Sadilek",
+    "score": 0.8235294222831726
+  },
+  "Eren Dinkci": {
+    "value": 6000000.0,
+    "matched_name": "Eren Dinkçi",
+    "score": 0.9090908765792847
+  },
+  "O. McBurnie": {
+    "value": 2500000.0,
+    "matched_name": "Oli McBurnie",
+    "score": 0.8695651888847351
+  },
+  "Lamine Yamal": {
+    "value": 200000000.0,
+    "matched_name": "Lamine Yamal",
+    "score": 1.0
+  },
+  "Marius Wolf": {
+    "value": 2500000.0,
+    "matched_name": "Marius Wolf",
+    "score": 1.0
+  },
+  "Kike Salas": {
+    "value": 14000000.0,
+    "matched_name": "Kike Salas",
+    "score": 1.0
+  },
+  "Benat Gerenabarrena": {
+    "value": 1000000.0,
+    "matched_name": "de Arruabarrena",
+    "score": 0.6470587849617004
+  },
+  "H. Kurucay": {
+    "value": 800000.0,
+    "matched_name": "Kuruçay",
+    "score": 0.7058823108673096
+  },
+  "A. Mille": {
+    "value": 10000000.0,
+    "matched_name": "Miller",
+    "score": 0.7142857313156128
+  },
+  "Iker Munoz": {
+    "value": 2000000.0,
+    "matched_name": "Iker Muñoz",
+    "score": 0.8999999761581421
+  },
+  "M. Tillman": {
+    "value": 30000000.0,
+    "matched_name": "Tillman",
+    "score": 0.8235294222831726
+  },
+  "Afonso Moreira": {
+    "value": 20000000.0,
+    "matched_name": "Afonso Moreira",
+    "score": 1.0
+  },
+  "Alieu Njie": {
+    "value": 3000000.0,
+    "matched_name": "Alieu Njie",
+    "score": 1.0
+  },
+  "A. Catena": {
+    "value": 2600000.0,
+    "matched_name": "Catena",
+    "score": 0.800000011920929
+  },
+  "R. Kolo Muani": {
+    "value": 20000000.0,
+    "matched_name": "Kolo Muani",
+    "score": 0.8695651888847351
+  },
+  "H. Massengo": {
+    "value": 8000000.0,
+    "matched_name": "Massengo",
+    "score": 0.8421052694320679
+  },
+  "M. Dituro": {
+    "value": 100000.0,
+    "matched_name": "Dituro",
+    "score": 0.800000011920929
+  },
+  "Jon Guridi": {
+    "value": 1800000.0,
+    "matched_name": "Jon Guridi",
+    "score": 1.0
+  },
+  "A. Cisse": {
+    "value": 350000.0,
+    "matched_name": "Cisse",
+    "score": 0.7692307829856873
+  },
+  "D. Greif": {
+    "value": 9000000.0,
+    "matched_name": "Greif",
+    "score": 0.7692307829856873
+  },
+  "Harry Winks": {
+    "value": 7000000.0,
+    "matched_name": "Harry Winks",
+    "score": 1.0
+  },
+  "James McAtee": {
+    "value": 18000000.0,
+    "matched_name": "James McAtee",
+    "score": 1.0
+  },
+  "H. Haraldsson": {
+    "value": 25000000.0,
+    "matched_name": "Haraldsson",
+    "score": 0.8695651888847351
+  },
+  "Y. Bisseck": {
+    "value": 50000000.0,
+    "matched_name": "Bisseck",
+    "score": 0.8235294222831726
+  },
+  "Ederson": {
+    "value": 10000000.0,
+    "matched_name": "Ederson",
+    "score": 1.0
+  },
+  "Ivan Ilic": {
+    "value": 7000000.0,
+    "matched_name": "Ivan Ilić",
+    "score": 0.8888888359069824
+  },
+  "J. Musiala": {
+    "value": 100000000.0,
+    "matched_name": "Musiala",
+    "score": 0.8235294222831726
+  },
+  "A. Pavlovic": {
+    "value": 90000000.0,
+    "matched_name": "Pavlovic",
+    "score": 0.8421052694320679
+  },
+  "T. Courtois": {
+    "value": 15000000.0,
+    "matched_name": "Courtois",
+    "score": 0.8421052694320679
+  },
+  "A. Pinamonti": {
+    "value": 15000000.0,
+    "matched_name": "Pinamonti",
+    "score": 0.8571428656578064
+  },
+  "Basar Onal": {
+    "value": 7000000.0,
+    "matched_name": "Başar Önal",
+    "score": 0.800000011920929
+  },
+  "A. Mac Allister": {
+    "value": 70000000.0,
+    "matched_name": "Mac Allister",
+    "score": 0.8888888359069824
+  },
+  "J. ter Horst": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "A. Bourabaa": {
+    "value": 1000000.0,
+    "matched_name": "Bourabia",
+    "score": 0.7368420958518982
+  },
+  "R. Sagrado": {
+    "value": 2000000.0,
+    "matched_name": "Sagrado",
+    "score": 0.8235294222831726
+  },
+  "Mama Balde": {
+    "value": 3000000.0,
+    "matched_name": "Mama Baldé",
+    "score": 0.8999999761581421
+  },
+  "Enzo Boyomo": {
+    "value": 15000000.0,
+    "matched_name": "Enzo Boyomo",
+    "score": 1.0
+  },
+  "Gabriel": {
+    "value": 75000000.0,
+    "matched_name": "Gabriel",
+    "score": 1.0
+  },
+  "M. McKenzie": {
+    "value": 7000000.0,
+    "matched_name": "McKenzie",
+    "score": 0.8421052694320679
+  },
+  "Sebastian Boselli": {
+    "value": 1500000.0,
+    "matched_name": "Sebastián Boselli",
+    "score": 0.9411764740943909
+  },
+  "F. Stankovic": {
+    "value": 1200000.0,
+    "matched_name": "Stankovic",
+    "score": 0.8571428656578064
+  },
+  "J. Vasquez": {
+    "value": 10000000.0,
+    "matched_name": "Jaquez",
+    "score": 0.75
+  },
+  "N. Mukiele": {
+    "value": 16000000.0,
+    "matched_name": "Mukiele",
+    "score": 0.8235294222831726
+  },
+  "R. Piccoli": {
+    "value": 14000000.0,
+    "matched_name": "Piccoli",
+    "score": 0.8235294222831726
+  },
+  "A. Gordon": {
+    "value": 65000000.0,
+    "matched_name": "Gordon",
+    "score": 0.800000011920929
+  },
+  "N. Gudelj": {
+    "value": 2000000.0,
+    "matched_name": "Gudelj",
+    "score": 0.800000011920929
+  },
+  "Francis Onyeka": {
+    "value": 6000000.0,
+    "matched_name": "Francis Onyeka",
+    "score": 1.0
+  },
+  "M. Damsgaard": {
+    "value": 30000000.0,
+    "matched_name": "Damsgaard",
+    "score": 0.8571428656578064
+  },
+  "M. Sierra": {
+    "value": 2000000.0,
+    "matched_name": "Sierra",
+    "score": 0.800000011920929
+  },
+  "J. Canvot": {
+    "value": 28000000.0,
+    "matched_name": "Canvot",
+    "score": 0.800000011920929
+  },
+  "Tasos Douvikas": {
+    "value": 25000000.0,
+    "matched_name": "Anastasios Douvikas",
+    "score": 0.7878788113594055
+  },
+  "A. Lauray": {
+    "value": 250000.0,
+    "matched_name": "Lauray",
+    "score": 0.800000011920929
+  },
+  "Ian Maatsen": {
+    "value": 30000000.0,
+    "matched_name": "Ian Maatsen",
+    "score": 1.0
+  },
+  "P. Zielinski": {
+    "value": 10000000.0,
+    "matched_name": "Zielinski",
+    "score": 0.8571428656578064
+  },
+  "Deniz Undav": {
+    "value": 22000000.0,
+    "matched_name": "Deniz Undav",
+    "score": 1.0
+  },
+  "Tomas Chory": {
+    "value": 2700000.0,
+    "matched_name": "Tomas Chory",
+    "score": 1.0
+  },
+  "Alvaro Valles": {
+    "value": 7000000.0,
+    "matched_name": "Álvaro Valles",
+    "score": 0.9230769276618958
+  },
+  "Sofiane Diop": {
+    "value": 15000000.0,
+    "matched_name": "Sofiane Diop",
+    "score": 1.0
+  },
+  "R. Haps": {
+    "value": 900000.0,
+    "matched_name": "Haps",
+    "score": 0.7272727489471436
+  },
+  "Arthur Atta": {
+    "value": 25000000.0,
+    "matched_name": "Arthur Atta",
+    "score": 1.0
+  },
+  "Tyrhys Dolan": {
+    "value": 10000000.0,
+    "matched_name": "Tyrhys Dolan",
+    "score": 1.0
+  },
+  "A. Laporte": {
+    "value": 8000000.0,
+    "matched_name": "Laporte",
+    "score": 0.8235294222831726
+  },
+  "Adrian de la Fuente": {
+    "value": 1500000.0,
+    "matched_name": "Konrad de la Fuente",
+    "score": 0.7894736528396606
+  },
+  "Bobby Thomas": {
+    "value": 2000000.0,
+    "matched_name": "Bobby Thomas",
+    "score": 1.0
+  },
+  "Che Adams": {
+    "value": 200000.0,
+    "matched_name": "Chase Adams",
+    "score": 0.8999999761581421
+  },
+  "Kieron Bowie": {
+    "value": 7000000.0,
+    "matched_name": "Kieron Bowie",
+    "score": 1.0
+  },
+  "Y. Ndayishimiye": {
+    "value": 7000000.0,
+    "matched_name": "Ndayishimiye",
+    "score": 0.8888888359069824
+  },
+  "L. Ullrich": {
+    "value": 6000000.0,
+    "matched_name": "Ullrich",
+    "score": 0.8235294222831726
+  },
+  "David Hancko": {
+    "value": 35000000.0,
+    "matched_name": "Dávid Hancko",
+    "score": 0.9166666269302368
+  },
+  "G. Antwi": {
+    "value": 350000.0,
+    "matched_name": "Antwi",
+    "score": 0.7692307829856873
+  },
+  "Enzo Le Fee": {
+    "value": 28000000.0,
+    "matched_name": "Enzo Le Fée",
+    "score": 0.9090908765792847
+  },
+  "Roberto Fernandez": {
+    "value": 10000000.0,
+    "matched_name": "Roberto Fernández",
+    "score": 0.9411764740943909
+  },
+  "Yeremy Pino": {
+    "value": 30000000.0,
+    "matched_name": "Yéremy Pino",
+    "score": 0.9090908765792847
+  },
+  "Hugo Picard": {
+    "value": 3000000.0,
+    "matched_name": "Hugo Picard",
+    "score": 1.0
+  },
+  "Lewis Miley": {
+    "value": 25000000.0,
+    "matched_name": "Lewis Miley",
+    "score": 1.0
+  },
+  "R. Le Guen": {
+    "value": 800000.0,
+    "matched_name": "Le Guen",
+    "score": 0.8235294222831726
+  },
+  "N. Stulic": {
+    "value": 3500000.0,
+    "matched_name": "Stulic",
+    "score": 0.800000011920929
+  },
+  "S. Birindelli": {
+    "value": 2500000.0,
+    "matched_name": "Birindelli",
+    "score": 0.8695651888847351
+  },
+  "A. Raimondo": {
+    "value": 3000000.0,
+    "matched_name": "Raimondo",
+    "score": 0.8421052694320679
+  },
+  "Keinan Davis": {
+    "value": 10000000.0,
+    "matched_name": "Keinan Davis",
+    "score": 1.0
+  },
+  "Lois Openda": {
+    "value": 25000000.0,
+    "matched_name": "Loïs Openda",
+    "score": 0.9090908765792847
+  },
+  "Arthur": {
+    "value": 8000000.0,
+    "matched_name": "Arthur",
+    "score": 1.0
+  },
+  "O. El Hilali": {
+    "value": 15000000.0,
+    "matched_name": "El Hilali",
+    "score": 0.8571428656578064
+  },
+  "H. Abdelli": {
+    "value": 5000000.0,
+    "matched_name": "Abdelli",
+    "score": 0.8235294222831726
+  },
+  "Marco Grull": {
+    "value": 4000000.0,
+    "matched_name": "Marco Grüll",
+    "score": 0.9090908765792847
+  },
+  "D. Dakonam": {
+    "value": 1400000.0,
+    "matched_name": "Dakonam Djené",
+    "score": 0.6086956262588501
+  },
+  "Y. Ebnoutalib": {
+    "value": 8000000.0,
+    "matched_name": "Ebnoutalib",
+    "score": 0.8695651888847351
+  },
+  "Giacomo Calo": {
+    "value": 750000.0,
+    "matched_name": "Giacomo Calò",
+    "score": 0.9166666269302368
+  },
+  "Loris Karius": {
+    "value": 1000000.0,
+    "matched_name": "Loris Karius",
+    "score": 1.0
+  },
+  "A. Colpani": {
+    "value": 6000000.0,
+    "matched_name": "Colpani",
+    "score": 0.8235294222831726
+  },
+  "R. Dasdamirov": {
+    "value": 500000.0,
+    "matched_name": "Dashdamirov",
+    "score": 0.8333333730697632
+  },
+  "F. Bredlow": {
+    "value": 700000.0,
+    "matched_name": "Bredlow",
+    "score": 0.8235294222831726
+  },
+  "L. Cabrera": {
+    "value": 1800000.0,
+    "matched_name": "Cabrera",
+    "score": 0.8235294222831726
+  },
+  "C. Kelleher": {
+    "value": 28000000.0,
+    "matched_name": "Kelleher",
+    "score": 0.8421052694320679
+  },
+  "Flavio Nazinho": {
+    "value": 600000.0,
+    "matched_name": "Flavio Bianchi",
+    "score": 0.7142857313156128
+  },
+  "Cher Ndour": {
+    "value": 20000000.0,
+    "matched_name": "Cher Ndour",
+    "score": 1.0
+  },
+  "G. Di Lorenzo": {
+    "value": 7500000.0,
+    "matched_name": "Di Lorenzo",
+    "score": 0.8695651888847351
+  },
+  "Nico Elvedi": {
+    "value": 8000000.0,
+    "matched_name": "Nico Elvedi",
+    "score": 1.0
+  },
+  "Emersonn": {
+    "value": 8000000.0,
+    "matched_name": "Emersonn",
+    "score": 1.0
+  },
+  "Danny Namaso": {
+    "value": 6000000.0,
+    "matched_name": "Danny Namaso",
+    "score": 1.0
+  },
+  "Reece James": {
+    "value": 60000000.0,
+    "matched_name": "Reece James",
+    "score": 1.0
+  },
+  "J. Lefort": {
+    "value": 1000000.0,
+    "matched_name": "Lefort",
+    "score": 0.800000011920929
+  },
+  "R. Bellanova": {
+    "value": 15000000.0,
+    "matched_name": "Bellanova",
+    "score": 0.8571428656578064
+  },
+  "E. Legros": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Said El Mala": {
+    "value": 45000000.0,
+    "matched_name": "Said El Mala",
+    "score": 1.0
+  },
+  "Ragnar Ache": {
+    "value": 9000000.0,
+    "matched_name": "Ragnar Ache",
+    "score": 1.0
+  },
+  "I. Balde": {
+    "value": 50000000.0,
+    "matched_name": "Balde",
+    "score": 0.7692307829856873
+  },
+  "B. Verbruggen": {
+    "value": 40000000.0,
+    "matched_name": "Verbruggen",
+    "score": 0.8695651888847351
+  },
+  "Diogo Sousa": {
+    "value": 8000000.0,
+    "matched_name": "Diogo Sousa",
+    "score": 1.0
+  },
+  "J. Andersen": {
+    "value": 20000000.0,
+    "matched_name": "Andersen",
+    "score": 0.8421052694320679
+  },
+  "G. Lloris": {
+    "value": 3000000.0,
+    "matched_name": "Lloris",
+    "score": 0.800000011920929
+  },
+  "N. Adjei": {
+    "value": 1500000.0,
+    "matched_name": "Adjei",
+    "score": 0.7692307829856873
+  },
+  "Christ Tape": {
+    "value": 350000.0,
+    "matched_name": "Chris Kane",
+    "score": 0.761904776096344
+  },
+  "N. Matic": {
+    "value": 1200000.0,
+    "matched_name": "Matic",
+    "score": 0.7692307829856873
+  },
+  "S. Becker": {
+    "value": 1500000.0,
+    "matched_name": "Becker",
+    "score": 0.800000011920929
+  },
+  "Dodo": {
+    "value": 300000.0,
+    "matched_name": "Dodoo",
+    "score": 0.8888888359069824
+  },
+  "Shea Charles": {
+    "value": 15000000.0,
+    "matched_name": "Shea Charles",
+    "score": 1.0
+  },
+  "Rodrigo Riquelme": {
+    "value": 4000000.0,
+    "matched_name": "Rodrigo Riquelme",
+    "score": 1.0
+  },
+  "A. Isaev": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Dilane Bakwa": {
+    "value": 28000000.0,
+    "matched_name": "Dilane Bakwa",
+    "score": 1.0
+  },
+  "Djibril Sow": {
+    "value": 7500000.0,
+    "matched_name": "Djibril Sow",
+    "score": 1.0
+  },
+  "Jonathan Tah": {
+    "value": 28000000.0,
+    "matched_name": "Jonathan Tah",
+    "score": 1.0
+  },
+  "Simon Sohm": {
+    "value": 8000000.0,
+    "matched_name": "Simon Sohm",
+    "score": 1.0
+  },
+  "David Soria": {
+    "value": 2800000.0,
+    "matched_name": "David Soria",
+    "score": 1.0
+  },
+  "J. van Hecke": {
+    "value": 45000000.0,
+    "matched_name": "van Hecke",
+    "score": 0.8571428656578064
+  },
+  "P. Tietz": {
+    "value": 4000000.0,
+    "matched_name": "Tietz",
+    "score": 0.7692307829856873
+  },
+  "M. Kayode": {
+    "value": 40000000.0,
+    "matched_name": "Kayode",
+    "score": 0.800000011920929
+  },
+  "Pathe Ciss": {
+    "value": 1800000.0,
+    "matched_name": "Pathé Ciss",
+    "score": 0.8999999761581421
+  },
+  "Joey Veerman": {
+    "value": 25000000.0,
+    "matched_name": "Joey Veerman",
+    "score": 1.0
+  },
+  "G. Bracaglia": {
+    "value": 100000.0,
+    "matched_name": "Bracali",
+    "score": 0.7368420958518982
+  },
+  "M. Cancellieri": {
+    "value": 7000000.0,
+    "matched_name": "Cancellieri",
+    "score": 0.8799999952316284
+  },
+  "E. Anderson": {
+    "value": 600000.0,
+    "matched_name": "Anderson",
+    "score": 0.8421052694320679
+  },
+  "D. Frattesi": {
+    "value": 22000000.0,
+    "matched_name": "Frattesi",
+    "score": 0.8421052694320679
+  },
+  "D. Sturm": {
+    "value": 2500000.0,
+    "matched_name": "Sturm",
+    "score": 0.7692307829856873
+  },
+  "Nacho Perez": {
+    "value": 300000.0,
+    "matched_name": "Nacho Pérez",
+    "score": 0.9090908765792847
+  },
+  "D. Scherhant": {
+    "value": 7500000.0,
+    "matched_name": "Scherhant",
+    "score": 0.8571428656578064
+  },
+  "Isaque": {
+    "value": 11000000.0,
+    "matched_name": "Isaque",
+    "score": 1.0
+  },
+  "Oscar Bobb": {
+    "value": 28000000.0,
+    "matched_name": "Oscar Bobb",
+    "score": 1.0
+  },
+  "T. Mitchell": {
+    "value": 25000000.0,
+    "matched_name": "Mitchell",
+    "score": 0.8421052694320679
+  },
+  "C. Tzolis": {
+    "value": 40000000.0,
+    "matched_name": "Tzolis",
+    "score": 0.800000011920929
+  },
+  "J. Belocian": {
+    "value": 12000000.0,
+    "matched_name": "Belocian",
+    "score": 0.8421052694320679
+  },
+  "V. Mykolenko": {
+    "value": 25000000.0,
+    "matched_name": "Mykolenko",
+    "score": 0.8571428656578064
+  },
+  "Bil Nsongo": {
+    "value": 250000.0,
+    "matched_name": "Billong",
+    "score": 0.7058823108673096
+  },
+  "M. Pasalic": {
+    "value": 150000.0,
+    "matched_name": "Pasagic",
+    "score": 0.7058823108673096
+  },
+  "Jon Moncayola": {
+    "value": 7000000.0,
+    "matched_name": "Jon Moncayola",
+    "score": 1.0
+  },
+  "Marc Pubill": {
+    "value": 35000000.0,
+    "matched_name": "Marc Pubill",
+    "score": 1.0
+  },
+  "Pau Navarro": {
+    "value": 15000000.0,
+    "matched_name": "Pau Navarro",
+    "score": 1.0
+  },
+  "Timothy Weah": {
+    "value": 20000000.0,
+    "matched_name": "Timothy Weah",
+    "score": 1.0
+  },
+  "Axel Witsel": {
+    "value": 1200000.0,
+    "matched_name": "Axel Witsel",
+    "score": 1.0
+  },
+  "Yuito Suzuki": {
+    "value": 24000000.0,
+    "matched_name": "Yuito Suzuki",
+    "score": 1.0
+  },
+  "E. Ayaosi": {
+    "value": 2000000.0,
+    "matched_name": "Ayaosi",
+    "score": 0.800000011920929
+  },
+  "Sven Botman": {
+    "value": 35000000.0,
+    "matched_name": "Sven Botman",
+    "score": 1.0
+  },
+  "E. Haaland": {
+    "value": 200000000.0,
+    "matched_name": "Haaland",
+    "score": 0.8235294222831726
+  },
+  "Jan Oblak": {
+    "value": 15000000.0,
+    "matched_name": "Jan Oblak",
+    "score": 1.0
+  },
+  "Antony": {
+    "value": 40000000.0,
+    "matched_name": "Antony",
+    "score": 1.0
+  },
+  "N. Mukau": {
+    "value": 15000000.0,
+    "matched_name": "Mukau",
+    "score": 0.7692307829856873
+  },
+  "M. Tavernier": {
+    "value": 25000000.0,
+    "matched_name": "Tavernier",
+    "score": 0.8571428656578064
+  },
+  "G. Gallon": {
+    "value": 600000.0,
+    "matched_name": "Gallon",
+    "score": 0.800000011920929
+  },
+  "M. Carnesecchi": {
+    "value": 30000000.0,
+    "matched_name": "Carnesecchi",
+    "score": 0.8799999952316284
+  },
+  "James Garner": {
+    "value": 45000000.0,
+    "matched_name": "James Garner",
+    "score": 1.0
+  },
+  "D. Maldini": {
+    "value": 9000000.0,
+    "matched_name": "Maldini",
+    "score": 0.8235294222831726
+  },
+  "G. Mancini": {
+    "value": 15000000.0,
+    "matched_name": "Mancini",
+    "score": 0.8235294222831726
+  },
+  "Manu Sanchez": {
+    "value": 6000000.0,
+    "matched_name": "Manu Sánchez",
+    "score": 0.9166666269302368
+  },
+  "Youri Regeer": {
+    "value": 5000000.0,
+    "matched_name": "Youri Regeer",
+    "score": 1.0
+  },
+  "Ross Barkley": {
+    "value": 4000000.0,
+    "matched_name": "Ross Barkley",
+    "score": 1.0
+  },
+  "Isco": {
+    "value": 3500000.0,
+    "matched_name": "Isco",
+    "score": 1.0
+  },
+  "Alex Scott": {
+    "value": 50000000.0,
+    "matched_name": "Alex Scott",
+    "score": 1.0
+  },
+  "L. Miller": {
+    "value": 200000.0,
+    "matched_name": "Lee Miller",
+    "score": 0.8421052694320679
+  },
+  "Dan Ndoye": {
+    "value": 32000000.0,
+    "matched_name": "Dan Ndoye",
+    "score": 1.0
+  },
+  "Arnau Martinez": {
+    "value": 10000000.0,
+    "matched_name": "Arnau Martínez",
+    "score": 0.9285714030265808
+  },
+  "H. Traore": {
+    "value": 1500000.0,
+    "matched_name": "Traore",
+    "score": 0.800000011920929
+  },
+  "I. Williams": {
+    "value": 40000000.0,
+    "matched_name": "Williams",
+    "score": 0.8421052694320679
+  },
+  "E. Fernandez": {
+    "value": 18000000.0,
+    "matched_name": "Fernandez",
+    "score": 0.8571428656578064
+  },
+  "Fermin": {
+    "value": 150000.0,
+    "matched_name": "Fermina",
+    "score": 0.9230769276618958
+  },
+  "J. Abankwah": {
+    "value": 3500000.0,
+    "matched_name": "Abankwah",
+    "score": 0.8421052694320679
+  },
+  "Patrick Berg": {
+    "value": 8000000.0,
+    "matched_name": "Patrick Berg",
+    "score": 1.0
+  },
+  "Marc Bartra": {
+    "value": 900000.0,
+    "matched_name": "Marc Bartra",
+    "score": 1.0
+  },
+  "Ivan Martin": {
+    "value": 400000.0,
+    "matched_name": "Ivan Martic",
+    "score": 0.9090908765792847
+  },
+  "Pedri": {
+    "value": 150000000.0,
+    "matched_name": "Pedri",
+    "score": 1.0
+  },
+  "H. Calhanoglu": {
+    "value": 300000.0,
+    "matched_name": "Calhanoglu",
+    "score": 0.8695651888847351
+  },
+  "Fer Nino": {
+    "value": 3000000.0,
+    "matched_name": "Fer Niño",
+    "score": 0.875
+  },
+  "V. Valdepenas": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "C. Kostoulas": {
+    "value": 25000000.0,
+    "matched_name": "Kostoulas",
+    "score": 0.8571428656578064
+  },
+  "N. Ahamada": {
+    "value": 3000000.0,
+    "matched_name": "Ahamada",
+    "score": 0.8235294222831726
+  },
+  "Rayan Cherki": {
+    "value": 90000000.0,
+    "matched_name": "Rayan Cherki",
+    "score": 1.0
+  },
+  "Viery": {
+    "value": 6000000.0,
+    "matched_name": "Viery",
+    "score": 1.0
+  },
+  "K. Hein": {
+    "value": 3000000.0,
+    "matched_name": "Karl Hein",
+    "score": 0.75
+  },
+  "M. van Ewijk": {
+    "value": 5000000.0,
+    "matched_name": "van Ewijk",
+    "score": 0.8571428656578064
+  },
+  "J. Mitchell": {
+    "value": 25000000.0,
+    "matched_name": "Mitchell",
+    "score": 0.8421052694320679
+  },
+  "Timo Becker": {
+    "value": 1500000.0,
+    "matched_name": "Timo Becker",
+    "score": 1.0
+  },
+  "G. Villar": {
+    "value": 1800000.0,
+    "matched_name": "Villar",
+    "score": 0.800000011920929
+  },
+  "Diogo Dalot": {
+    "value": 30000000.0,
+    "matched_name": "Diogo Dalot",
+    "score": 1.0
+  },
+  "M. Baturina": {
+    "value": 30000000.0,
+    "matched_name": "Baturina",
+    "score": 0.8421052694320679
+  },
+  "M. Satriano": {
+    "value": 10000000.0,
+    "matched_name": "Satriano",
+    "score": 0.8421052694320679
+  },
+  "Jayden Bogle": {
+    "value": 15000000.0,
+    "matched_name": "Jayden Bogle",
+    "score": 1.0
+  },
+  "Nicolas Pepe": {
+    "value": 100000.0,
+    "matched_name": "Nicolas Perez",
+    "score": 0.8799999952316284
+  },
+  "C. Fuhrich": {
+    "value": 12000000.0,
+    "matched_name": "Führich",
+    "score": 0.7058823108673096
+  },
+  "M. Nguefack": {
+    "value": 3000000.0,
+    "matched_name": "Negueba",
+    "score": 0.5555555820465088
+  },
+  "E. Galilea": {
+    "value": 400000.0,
+    "matched_name": "Galilea",
+    "score": 0.8235294222831726
+  },
+  "Adam Obert": {
+    "value": 7000000.0,
+    "matched_name": "Adam Obert",
+    "score": 1.0
+  },
+  "E. Buendia": {
+    "value": 16000000.0,
+    "matched_name": "Buendía",
+    "score": 0.7058823108673096
+  },
+  "Willian Pacho": {
+    "value": 80000000.0,
+    "matched_name": "Willian Pacho",
+    "score": 1.0
+  },
+  "L. Gourna-Douath": {
+    "value": 6000000.0,
+    "matched_name": "Gourna-Douath",
+    "score": 0.8965517282485962
+  },
+  "M. Oyarzabal": {
+    "value": 25000000.0,
+    "matched_name": "Oyarzabal",
+    "score": 0.8571428656578064
+  },
+  "Bukayo Saka": {
+    "value": 110000000.0,
+    "matched_name": "Bukayo Saka",
+    "score": 1.0
+  },
+  "Ben White": {
+    "value": 30000000.0,
+    "matched_name": "Ben White",
+    "score": 1.0
+  },
+  "A. Piedfort": {
+    "value": 4000000.0,
+    "matched_name": "Piedfort",
+    "score": 0.8421052694320679
+  },
+  "Y. Engelhardt": {
+    "value": 7000000.0,
+    "matched_name": "Engelhardt",
+    "score": 0.8695651888847351
+  },
+  "Antonio Silva": {
+    "value": 25000000.0,
+    "matched_name": "António Silva",
+    "score": 0.9230769276618958
+  },
+  "B. Kamara": {
+    "value": 50000.0,
+    "matched_name": "Bai Kamara",
+    "score": 0.8421052694320679
+  },
+  "P. Mwene": {
+    "value": 1500000.0,
+    "matched_name": "Mwene",
+    "score": 0.7692307829856873
+  },
+  "Ivan Perisic": {
+    "value": 200000.0,
+    "matched_name": "Ivan Pesic",
+    "score": 0.9090908765792847
+  },
+  "C. Nkunku": {
+    "value": 25000000.0,
+    "matched_name": "Nkunku",
+    "score": 0.800000011920929
+  },
+  "Yoel Lago": {
+    "value": 4000000.0,
+    "matched_name": "Yoel Lago",
+    "score": 1.0
+  },
+  "P. Comuzzo": {
+    "value": 18000000.0,
+    "matched_name": "Comuzzo",
+    "score": 0.8235294222831726
+  },
+  "Issa Diop": {
+    "value": 8000000.0,
+    "matched_name": "Issa Diop",
+    "score": 1.0
+  },
+  "F. Jutgla": {
+    "value": 10000000.0,
+    "matched_name": "Jutglà",
+    "score": 0.6666666269302368
+  },
+  "V. Nielsen": {
+    "value": 1800000.0,
+    "matched_name": "Nielsen",
+    "score": 0.8235294222831726
+  },
+  "J. Vercruysse": {
+    "value": 1400000.0,
+    "matched_name": "Verre",
+    "score": 0.5555555820465088
+  },
+  "A. Truffert": {
+    "value": 30000000.0,
+    "matched_name": "Truffert",
+    "score": 0.8421052694320679
+  },
+  "M. Vojvoda": {
+    "value": 2500000.0,
+    "matched_name": "Vojvoda",
+    "score": 0.8235294222831726
+  },
+  "Edu Exposito": {
+    "value": 5000000.0,
+    "matched_name": "Edu Expósito",
+    "score": 0.9166666269302368
+  },
+  "F. Ugrinic": {
+    "value": 6000000.0,
+    "matched_name": "Ugrinic",
+    "score": 0.8235294222831726
+  },
+  "D. Rensch": {
+    "value": 8500000.0,
+    "matched_name": "Rensch",
+    "score": 0.800000011920929
+  },
+  "Wesley": {
+    "value": 40000000.0,
+    "matched_name": "Wesley",
+    "score": 1.0
+  },
+  "Q. Merlin": {
+    "value": 15000000.0,
+    "matched_name": "Merlin",
+    "score": 0.800000011920929
+  },
+  "John Yeboah": {
+    "value": 1500000.0,
+    "matched_name": "John Yeboah",
+    "score": 1.0
+  },
+  "R. Messali": {
+    "value": 1500000.0,
+    "matched_name": "Messali",
+    "score": 0.8235294222831726
+  },
+  "Ze Pedro": {
+    "value": 3000000.0,
+    "matched_name": "Zé Pedro",
+    "score": 0.875
+  },
+  "Alexsandro": {
+    "value": 15000000.0,
+    "matched_name": "Alexsandro",
+    "score": 1.0
+  },
+  "T. Meunier": {
+    "value": 1500000.0,
+    "matched_name": "Meunier",
+    "score": 0.8235294222831726
+  },
+  "E. Banzuzi": {
+    "value": 16000000.0,
+    "matched_name": "Banzuzi",
+    "score": 0.8235294222831726
+  },
+  "Amine Harit": {
+    "value": 5000000.0,
+    "matched_name": "Amine Harit",
+    "score": 1.0
+  },
+  "Jay Idzes": {
+    "value": 14000000.0,
+    "matched_name": "Jay Idzes",
+    "score": 1.0
+  },
+  "A. Cacciamani": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "L. Lochoshvili": {
+    "value": 2500000.0,
+    "matched_name": "Lochoshvili",
+    "score": 0.8799999952316284
+  },
+  "C. De Ketelaere": {
+    "value": 30000000.0,
+    "matched_name": "De Ketelaere",
+    "score": 0.8888888359069824
+  },
+  "J. Burkardt": {
+    "value": 30000000.0,
+    "matched_name": "Burkardt",
+    "score": 0.8421052694320679
+  },
+  "David de Gea": {
+    "value": 3500000.0,
+    "matched_name": "David de Gea",
+    "score": 1.0
+  },
+  "Felix Bacher": {
+    "value": 6000000.0,
+    "matched_name": "Felix Bacher",
+    "score": 1.0
+  },
+  "L. Lucchesi": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "D. Szoboszlai": {
+    "value": 100000000.0,
+    "matched_name": "Szoboszlai",
+    "score": 0.8695651888847351
+  },
+  "A. Vergara": {
+    "value": 15000000.0,
+    "matched_name": "Vergara",
+    "score": 0.8235294222831726
+  },
+  "Pablo Ibanez": {
+    "value": 4000000.0,
+    "matched_name": "Pablo Ibáñez",
+    "score": 0.8333333730697632
+  },
+  "R. Belghali": {
+    "value": 7000000.0,
+    "matched_name": "Belghali",
+    "score": 0.8421052694320679
+  },
+  "Steve Solvet": {
+    "value": 150000.0,
+    "matched_name": "Steve Colpaert",
+    "score": 0.7692307829856873
+  },
+  "R. Ripart": {
+    "value": 2000000.0,
+    "matched_name": "Ripart",
+    "score": 0.800000011920929
+  },
+  "J. Dubasin": {
+    "value": 12000000.0,
+    "matched_name": "Justin",
+    "score": 0.625
+  },
+  "Seydou Fini": {
+    "value": 1000000.0,
+    "matched_name": "Seydou Fini",
+    "score": 1.0
+  },
+  "Enes Unal": {
+    "value": 7000000.0,
+    "matched_name": "Enes Ünal",
+    "score": 0.8888888359069824
+  },
+  "R. Belahyane": {
+    "value": 6800000.0,
+    "matched_name": "Belahyane",
+    "score": 0.8571428656578064
+  },
+  "N. Milenkovic": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Pedro Henrique": {
+    "value": 8000000.0,
+    "matched_name": "Pedro Henrique",
+    "score": 1.0
+  },
+  "F. Medina": {
+    "value": 18000000.0,
+    "matched_name": "Medina",
+    "score": 0.800000011920929
+  },
+  "Diego Carlos": {
+    "value": 5000000.0,
+    "matched_name": "Diego Carlos",
+    "score": 1.0
+  },
+  "Luis Milla": {
+    "value": 3500000.0,
+    "matched_name": "Luis Milla",
+    "score": 1.0
+  },
+  "O. Kossounou": {
+    "value": 15000000.0,
+    "matched_name": "Kossounou",
+    "score": 0.8571428656578064
+  },
+  "L. Palmisani": {
+    "value": 200000.0,
+    "matched_name": "Palmisani",
+    "score": 0.8571428656578064
+  },
+  "Ander Barrenetxea": {
+    "value": 18000000.0,
+    "matched_name": "Ander Barrenetxea",
+    "score": 1.0
+  },
+  "L. Sinayoko": {
+    "value": 10000000.0,
+    "matched_name": "Sinayoko",
+    "score": 0.8421052694320679
+  },
+  "Y. Alvarez": {
+    "value": 100000000.0,
+    "matched_name": "Alvarez",
+    "score": 0.8235294222831726
+  },
+  "Elye Wahi": {
+    "value": 18000000.0,
+    "matched_name": "Elye Wahi",
+    "score": 1.0
+  },
+  "J. Kluivert": {
+    "value": 25000000.0,
+    "matched_name": "Kluivert",
+    "score": 0.8421052694320679
+  },
+  "A. Rebbach": {
+    "value": 2500000.0,
+    "matched_name": "Rebbach",
+    "score": 0.8235294222831726
+  },
+  "Marc Bernal": {
+    "value": 30000000.0,
+    "matched_name": "Marc Bernal",
+    "score": 1.0
+  },
+  "K. Alajbegovic": {
+    "value": 22000000.0,
+    "matched_name": "Alajbegovic",
+    "score": 0.8799999952316284
+  },
+  "F. Mastantuono": {
+    "value": 45000000.0,
+    "matched_name": "Mastantuono",
+    "score": 0.8799999952316284
+  },
+  "J. Fazzini": {
+    "value": 8500000.0,
+    "matched_name": "Fazzini",
+    "score": 0.8235294222831726
+  },
+  "Noa Boisse": {
+    "value": 600000.0,
+    "matched_name": "Noah Botic",
+    "score": 0.699999988079071
+  },
+  "Keita Kosugi": {
+    "value": 5000000.0,
+    "matched_name": "Keita Kosugi",
+    "score": 1.0
+  },
+  "Dani Lorenzo": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Mats Rots": {
+    "value": 12000000.0,
+    "matched_name": "Mats Rots",
+    "score": 1.0
+  },
+  "Dembo Sylla": {
+    "value": 1000000.0,
+    "matched_name": "Dembo Sylla",
+    "score": 1.0
+  },
+  "J. Gimenez": {
+    "value": 18000000.0,
+    "matched_name": "Gimenez",
+    "score": 0.8235294222831726
+  },
+  "G. Busio": {
+    "value": 5500000.0,
+    "matched_name": "Busio",
+    "score": 0.7692307829856873
+  },
+  "Lukas Petkov": {
+    "value": 3000000.0,
+    "matched_name": "Lukas Petkov",
+    "score": 1.0
+  },
+  "Diego Gomez": {
+    "value": 25000000.0,
+    "matched_name": "Diego Gómez",
+    "score": 0.9090908765792847
+  },
+  "L. Avdullahu": {
+    "value": 30000000.0,
+    "matched_name": "Avdullahu",
+    "score": 0.8571428656578064
+  },
+  "T. Awoniyi": {
+    "value": 8000000.0,
+    "matched_name": "Awoniyi",
+    "score": 0.8235294222831726
+  },
+  "Unai Lopez": {
+    "value": 2500000.0,
+    "matched_name": "Unai López",
+    "score": 0.8999999761581421
+  },
+  "P. Fornals": {
+    "value": 8000000.0,
+    "matched_name": "Fornals",
+    "score": 0.8235294222831726
+  },
+  "I. Ndiaye": {
+    "value": 55000000.0,
+    "matched_name": "Ndiaye",
+    "score": 0.800000011920929
+  },
+  "M. Safonov": {
+    "value": 30000000.0,
+    "matched_name": "Safonov",
+    "score": 0.8235294222831726
+  },
+  "Manuel Neuer": {
+    "value": 4000000.0,
+    "matched_name": "Manuel Neuer",
+    "score": 1.0
+  },
+  "Pablo Garcia": {
+    "value": 8000000.0,
+    "matched_name": "Pablo García",
+    "score": 0.9166666269302368
+  },
+  "Tiago Santos": {
+    "value": 10000000.0,
+    "matched_name": "Tiago Santos",
+    "score": 1.0
+  },
+  "A. Khusanov": {
+    "value": 50000000.0,
+    "matched_name": "Khusanov",
+    "score": 0.8421052694320679
+  },
+  "Felix Keidel": {
+    "value": 150000.0,
+    "matched_name": "Felix Meiser",
+    "score": 0.75
+  },
+  "Jair Cunha": {
+    "value": 15000000.0,
+    "matched_name": "Jair Cunha",
+    "score": 1.0
+  },
+  "Amine Sbai": {
+    "value": 4000000.0,
+    "matched_name": "Amine Sbaï",
+    "score": 0.8999999761581421
+  },
+  "Finn Dahmen": {
+    "value": 12000000.0,
+    "matched_name": "Finn Dahmen",
+    "score": 1.0
+  },
+  "Nayef Aguerd": {
+    "value": 15000000.0,
+    "matched_name": "Nayef Aguerd",
+    "score": 1.0
+  },
+  "Jon Ander Olasagasti": {
+    "value": 2500000.0,
+    "matched_name": "Jon Ander Olasagasti",
+    "score": 1.0
+  },
+  "A. Gronbaek": {
+    "value": 5000000.0,
+    "matched_name": "Grønbaek",
+    "score": 0.7368420958518982
+  },
+  "Elias Jelert": {
+    "value": 5500000.0,
+    "matched_name": "Elias Jelert",
+    "score": 1.0
+  },
+  "F. Uduokhai": {
+    "value": 3500000.0,
+    "matched_name": "Uduokhai",
+    "score": 0.8421052694320679
+  },
+  "D. Upamecano": {
+    "value": 70000000.0,
+    "matched_name": "Upamecano",
+    "score": 0.8571428656578064
+  },
+  "Y. Diouf": {
+    "value": 28000000.0,
+    "matched_name": "Diouf",
+    "score": 0.7692307829856873
+  },
+  "R. Alhassane": {
+    "value": 1500000.0,
+    "matched_name": "Alhassane",
+    "score": 0.8571428656578064
+  },
+  "Maduka Okoye": {
+    "value": 10000000.0,
+    "matched_name": "Maduka Okoye",
+    "score": 1.0
+  },
+  "J. Tarkowski": {
+    "value": 5000000.0,
+    "matched_name": "Tarkowski",
+    "score": 0.8571428656578064
+  },
+  "C. Egan-Riley": {
+    "value": 9000000.0,
+    "matched_name": "CJ Egan-Riley",
+    "score": 0.9230769276618958
+  },
+  "Kai Havertz": {
+    "value": 55000000.0,
+    "matched_name": "Kai Havertz",
+    "score": 1.0
+  },
+  "L. Spinazzola": {
+    "value": 3500000.0,
+    "matched_name": "Spinazzola",
+    "score": 0.8695651888847351
+  },
+  "Kevin Danso": {
+    "value": 20000000.0,
+    "matched_name": "Kevin Danso",
+    "score": 1.0
+  },
+  "J. Bellingham": {
+    "value": 130000000.0,
+    "matched_name": "Bellingham",
+    "score": 0.8695651888847351
+  },
+  "Sergi Cardona": {
+    "value": 9000000.0,
+    "matched_name": "Sergi Cardona",
+    "score": 1.0
+  },
+  "T. Barry": {
+    "value": 30000000.0,
+    "matched_name": "Barry",
+    "score": 0.7692307829856873
+  },
+  "E. Corvi": {
+    "value": 1500000.0,
+    "matched_name": "Corvi",
+    "score": 0.7692307829856873
+  },
+  "Ruben Garcia": {
+    "value": 1600000.0,
+    "matched_name": "Rubén García",
+    "score": 0.8333333730697632
+  },
+  "H. Elliott": {
+    "value": 20000000.0,
+    "matched_name": "Elliott",
+    "score": 0.8235294222831726
+  },
+  "Nuno Tavares": {
+    "value": 12000000.0,
+    "matched_name": "Nuno Tavares",
+    "score": 1.0
+  },
+  "M. Rogers": {
+    "value": 90000000.0,
+    "matched_name": "Rogers",
+    "score": 0.800000011920929
+  },
+  "S. Pokatilov": {
+    "value": 500000.0,
+    "matched_name": "Pokatilov",
+    "score": 0.8571428656578064
+  },
+  "G. Simeone": {
+    "value": 40000000.0,
+    "matched_name": "Simeone",
+    "score": 0.8235294222831726
+  },
+  "Emerson": {
+    "value": 9000000.0,
+    "matched_name": "Emerson",
+    "score": 1.0
+  },
+  "L. Ferguson": {
+    "value": 20000000.0,
+    "matched_name": "Ferguson",
+    "score": 0.8421052694320679
+  },
+  "Pablo Martinez": {
+    "value": 3000000.0,
+    "matched_name": "Pablo Martínez",
+    "score": 0.9285714030265808
+  },
+  "Ayumu Seko": {
+    "value": 5000000.0,
+    "matched_name": "Ayumu Seko",
+    "score": 1.0
+  },
+  "C. Cresswell": {
+    "value": 25000000.0,
+    "matched_name": "Cresswell",
+    "score": 0.8571428656578064
+  },
+  "M. Thuram": {
+    "value": 200000.0,
+    "matched_name": "Thuram",
+    "score": 0.800000011920929
+  },
+  "L. Skorupski": {
+    "value": 2000000.0,
+    "matched_name": "Skorupski",
+    "score": 0.8571428656578064
+  },
+  "Assane Diao": {
+    "value": 30000000.0,
+    "matched_name": "Assane Diao",
+    "score": 1.0
+  },
+  "Harold Voyer": {
+    "value": 200000.0,
+    "matched_name": "Harold Osorio",
+    "score": 0.7200000286102295
+  },
+  "Victor Munoz": {
+    "value": 30000000.0,
+    "matched_name": "Víctor Muñoz",
+    "score": 0.8333333730697632
+  },
+  "Murillo": {
+    "value": 50000000.0,
+    "matched_name": "Murillo",
+    "score": 1.0
+  },
+  "R. Torrente": {
+    "value": 2500000.0,
+    "matched_name": "Torrente",
+    "score": 0.8421052694320679
+  },
+  "Can Uzun": {
+    "value": 45000000.0,
+    "matched_name": "Can Uzun",
+    "score": 1.0
+  },
+  "F. Thauvin": {
+    "value": 5000000.0,
+    "matched_name": "Thauvin",
+    "score": 0.8235294222831726
+  },
+  "David Raum": {
+    "value": 25000000.0,
+    "matched_name": "David Raum",
+    "score": 1.0
+  },
+  "S. Kolasinac": {
+    "value": 4000000.0,
+    "matched_name": "Kolasinac",
+    "score": 0.8571428656578064
+  },
+  "P. Brunner": {
+    "value": 1500000.0,
+    "matched_name": "Brunner",
+    "score": 0.8235294222831726
+  },
+  "M. Odegaard": {
+    "value": 12000000.0,
+    "matched_name": "Odgaard",
+    "score": 0.7777777910232544
+  },
+  "A. Bretones": {
+    "value": 3500000.0,
+    "matched_name": "Bretones",
+    "score": 0.8421052694320679
+  },
+  "R. Floriani Mussolini": {
+    "value": 2500000.0,
+    "matched_name": "Floriani Mussolini",
+    "score": 0.9230769276618958
+  },
+  "Luca Lipani": {
+    "value": 7500000.0,
+    "matched_name": "Luca Lipani",
+    "score": 1.0
+  },
+  "T. Alexander-Arnold": {
+    "value": 60000000.0,
+    "matched_name": "Alexander-Arnold",
+    "score": 0.9142857193946838
+  },
+  "R. Philippe": {
+    "value": 4000000.0,
+    "matched_name": "Philippe",
+    "score": 0.8421052694320679
+  },
+  "T. Fernandez": {
+    "value": 18000000.0,
+    "matched_name": "Fernandez",
+    "score": 0.8571428656578064
+  },
+  "Nico Gonzalez": {
+    "value": 40000000.0,
+    "matched_name": "Nico González",
+    "score": 0.9230769276618958
+  },
+  "Antonio Blanco": {
+    "value": 10000000.0,
+    "matched_name": "Antonio Blanco",
+    "score": 1.0
+  },
+  "A. Helmersen": {
+    "value": 1200000.0,
+    "matched_name": "Helmersen",
+    "score": 0.8571428656578064
+  },
+  "M. Samatta": {
+    "value": 700000.0,
+    "matched_name": "Samatta",
+    "score": 0.8235294222831726
+  },
+  "E. Martinez": {
+    "value": 250000.0,
+    "matched_name": "Martinez",
+    "score": 0.8421052694320679
+  },
+  "G. Moreno": {
+    "value": 100000.0,
+    "matched_name": "Moreno",
+    "score": 0.800000011920929
+  },
+  "M. Yalcouye": {
+    "value": 12000000.0,
+    "matched_name": "Yalcouyé",
+    "score": 0.7368420958518982
+  },
+  "Daniel Munoz": {
+    "value": 22000000.0,
+    "matched_name": "Daniel Muñoz",
+    "score": 0.9166666269302368
+  },
+  "T. Hazard": {
+    "value": 5000000.0,
+    "matched_name": "Hazard",
+    "score": 0.800000011920929
+  },
+  "S. Sabelli": {
+    "value": 1300000.0,
+    "matched_name": "Sabelli",
+    "score": 0.8235294222831726
+  },
+  "Luka Modric": {
+    "value": 3500000.0,
+    "matched_name": "Luka Modrić",
+    "score": 0.9090908765792847
+  },
+  "J. Chotard": {
+    "value": 7000000.0,
+    "matched_name": "Chotard",
+    "score": 0.8235294222831726
+  },
+  "D. Doekhi": {
+    "value": 13000000.0,
+    "matched_name": "Doekhi",
+    "score": 0.800000011920929
+  },
+  "A. Isak": {
+    "value": 85000000.0,
+    "matched_name": "Isak",
+    "score": 0.7272727489471436
+  },
+  "A. El Ouazzani": {
+    "value": 2500000.0,
+    "matched_name": "El Ouazzani",
+    "score": 0.8799999952316284
+  },
+  "M. Niakhate": {
+    "value": 15000000.0,
+    "matched_name": "Niakhaté",
+    "score": 0.7368420958518982
+  },
+  "M. Gibbs-White": {
+    "value": 70000000.0,
+    "matched_name": "Gibbs-White",
+    "score": 0.8799999952316284
+  },
+  "T. Koopmeiners": {
+    "value": 14000000.0,
+    "matched_name": "Koopmeiners",
+    "score": 0.8799999952316284
+  },
+  "J. Jacquet": {
+    "value": 55000000.0,
+    "matched_name": "Jacquet",
+    "score": 0.8235294222831726
+  },
+  "B. Brobbey": {
+    "value": 30000000.0,
+    "matched_name": "Brobbey",
+    "score": 0.8235294222831726
+  },
+  "J. Alvarez": {
+    "value": 100000000.0,
+    "matched_name": "Alvarez",
+    "score": 0.8235294222831726
+  },
+  "R. Hojlund": {
+    "value": 60000000.0,
+    "matched_name": "Højlund",
+    "score": 0.7058823108673096
+  },
+  "M. Dmitrovic": {
+    "value": 700000.0,
+    "matched_name": "Dmitrovic",
+    "score": 0.8571428656578064
+  },
+  "M. Troilo": {
+    "value": 10000000.0,
+    "matched_name": "Troilo",
+    "score": 0.800000011920929
+  },
+  "Tyler Adams": {
+    "value": 25000000.0,
+    "matched_name": "Tyler Adams",
+    "score": 1.0
+  },
+  "V. Adzic": {
+    "value": 600000.0,
+    "matched_name": "Adzic",
+    "score": 0.7692307829856873
+  },
+  "Lucas Boye": {
+    "value": 5000000.0,
+    "matched_name": "Lucas Boyé",
+    "score": 0.8999999761581421
+  },
+  "Marquinhos": {
+    "value": 28000000.0,
+    "matched_name": "Marquinhos",
+    "score": 1.0
+  },
+  "Javi Rueda": {
+    "value": 6000000.0,
+    "matched_name": "Javi Rueda",
+    "score": 1.0
+  },
+  "D. Kamada": {
+    "value": 10000000.0,
+    "matched_name": "Kamada",
+    "score": 0.800000011920929
+  },
+  "Abner Vinicius": {
+    "value": 150000.0,
+    "matched_name": "Vinicius",
+    "score": 0.7272727489471436
+  },
+  "Eric Dier": {
+    "value": 4000000.0,
+    "matched_name": "Eric Dier",
+    "score": 1.0
+  },
+  "Amine Gouiri": {
+    "value": 28000000.0,
+    "matched_name": "Amine Gouiri",
+    "score": 1.0
+  },
+  "Rafita Garrido": {
+    "value": 50000.0,
+    "matched_name": "Nil Garrido",
+    "score": 0.7200000286102295
+  },
+  "M. Keita": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "R. Mandragora": {
+    "value": 9000000.0,
+    "matched_name": "Mandragora",
+    "score": 0.8695651888847351
+  },
+  "Lucas Perri": {
+    "value": 10000000.0,
+    "matched_name": "Lucas Perri",
+    "score": 1.0
+  },
+  "G. Quagliata": {
+    "value": 1700000.0,
+    "matched_name": "Quagliata",
+    "score": 0.8571428656578064
+  },
+  "Y. Belkhdim": {
+    "value": 7000000.0,
+    "matched_name": "Belkhdim",
+    "score": 0.8421052694320679
+  },
+  "Andrei Radu": {
+    "value": 200000.0,
+    "matched_name": "Andrei Radu",
+    "score": 1.0
+  },
+  "L. Hradecky": {
+    "value": 1500000.0,
+    "matched_name": "Hradecky",
+    "score": 0.8421052694320679
+  },
+  "M. Lacroix": {
+    "value": 50000000.0,
+    "matched_name": "Lacroix",
+    "score": 0.8235294222831726
+  },
+  "Y. Hernandez": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Ilan Kebbal": {
+    "value": 12000000.0,
+    "matched_name": "Ilan Kebbal",
+    "score": 1.0
+  },
+  "Dean Huijsen": {
+    "value": 60000000.0,
+    "matched_name": "Dean Huijsen",
+    "score": 1.0
+  },
+  "Frank Onyeka": {
+    "value": 8000000.0,
+    "matched_name": "Frank Onyeka",
+    "score": 1.0
+  },
+  "Pablo Pagis": {
+    "value": 15000000.0,
+    "matched_name": "Pablo Pagis",
+    "score": 1.0
+  },
+  "S. Comesana": {
+    "value": 8000000.0,
+    "matched_name": "Comesaña",
+    "score": 0.7368420958518982
+  },
+  "Ibrahim Maza": {
+    "value": 45000000.0,
+    "matched_name": "Ibrahim Maza",
+    "score": 1.0
+  },
+  "Adam Hlozek": {
+    "value": 10000000.0,
+    "matched_name": "Adam Hlozek",
+    "score": 1.0
+  },
+  "P. Kalulu": {
+    "value": 32000000.0,
+    "matched_name": "Kalulu",
+    "score": 0.800000011920929
+  },
+  "M. Matviyenko": {
+    "value": 12000000.0,
+    "matched_name": "Matvienko",
+    "score": 0.8181818127632141
+  },
+  "Brugui": {
+    "value": 50000.0,
+    "matched_name": "Burgui",
+    "score": 0.8333333730697632
+  },
+  "Igor Paixao": {
+    "value": 35000000.0,
+    "matched_name": "Igor Paixão",
+    "score": 0.9090908765792847
+  },
+  "J. Todibo": {
+    "value": 22000000.0,
+    "matched_name": "Todibo",
+    "score": 0.800000011920929
+  },
+  "Daizen Maeda": {
+    "value": 13000000.0,
+    "matched_name": "Daizen Maeda",
+    "score": 1.0
+  },
+  "S. Chaloupek": {
+    "value": 10000000.0,
+    "matched_name": "Chaloupek",
+    "score": 0.8571428656578064
+  },
+  "Hugo Alvarez": {
+    "value": 8000000.0,
+    "matched_name": "Hugo Álvarez",
+    "score": 0.9166666269302368
+  },
+  "S. Hidalgo": {
+    "value": 6000000.0,
+    "matched_name": "Hidalgo",
+    "score": 0.8235294222831726
+  },
+  "M. Hermoso": {
+    "value": 7000000.0,
+    "matched_name": "Hermoso",
+    "score": 0.8235294222831726
+  },
+  "K. Antonio": {
+    "value": 3000000.0,
+    "matched_name": "Antonio",
+    "score": 0.8235294222831726
+  },
+  "L. Brassier": {
+    "value": 12000000.0,
+    "matched_name": "Brassier",
+    "score": 0.8421052694320679
+  },
+  "G. Bremer": {
+    "value": 35000000.0,
+    "matched_name": "Bremer",
+    "score": 0.800000011920929
+  },
+  "Jose Salinas": {
+    "value": 2000000.0,
+    "matched_name": "José Salinas",
+    "score": 0.9166666269302368
+  },
+  "G. Promel": {
+    "value": 6000000.0,
+    "matched_name": "Promes",
+    "score": 0.6666666269302368
+  },
+  "J. Acheampong": {
+    "value": 25000000.0,
+    "matched_name": "Acheampong",
+    "score": 0.8695651888847351
+  },
+  "Kevin Trapp": {
+    "value": 1800000.0,
+    "matched_name": "Kevin Trapp",
+    "score": 1.0
+  },
+  "L. Da Cunha": {
+    "value": 20000000.0,
+    "matched_name": "Da Cunha",
+    "score": 0.8421052694320679
+  },
+  "H. Barnes": {
+    "value": 32000000.0,
+    "matched_name": "Barnes",
+    "score": 0.800000011920929
+  },
+  "T. Kubo": {
+    "value": 20000000.0,
+    "matched_name": "Kubo",
+    "score": 0.7272727489471436
+  },
+  "Nilson Angulo": {
+    "value": 17000000.0,
+    "matched_name": "Nilson Angulo",
+    "score": 1.0
+  },
+  "Pedro Bigas": {
+    "value": 300000.0,
+    "matched_name": "Pedro Bigas",
+    "score": 1.0
+  },
+  "A. Monfray": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "S. Pierotti": {
+    "value": 4000000.0,
+    "matched_name": "Pierotti",
+    "score": 0.8421052694320679
+  },
+  "B. Cristante": {
+    "value": 7000000.0,
+    "matched_name": "Cristante",
+    "score": 0.8571428656578064
+  },
+  "E. Toure": {
+    "value": 300000.0,
+    "matched_name": "Toure",
+    "score": 0.7692307829856873
+  },
+  "Josh Doig": {
+    "value": 4500000.0,
+    "matched_name": "Josh Doig",
+    "score": 1.0
+  },
+  "V. Milinkovic-Savic": {
+    "value": 20000000.0,
+    "matched_name": "Milinković-Savić",
+    "score": 0.800000011920929
+  },
+  "R. Sato": {
+    "value": 2000000.0,
+    "matched_name": "Sato",
+    "score": 0.7272727489471436
+  },
+  "Zion Suzuki": {
+    "value": 20000000.0,
+    "matched_name": "Zion Suzuki",
+    "score": 1.0
+  },
+  "Philipp Treu": {
+    "value": 15000000.0,
+    "matched_name": "Philipp Treu",
+    "score": 1.0
+  },
+  "A. Robinson": {
+    "value": 22000000.0,
+    "matched_name": "Robinson",
+    "score": 0.8421052694320679
+  },
+  "K. Lewis-Potter": {
+    "value": 25000000.0,
+    "matched_name": "Lewis-Potter",
+    "score": 0.8888888359069824
+  },
+  "Unai Nunez": {
+    "value": 3500000.0,
+    "matched_name": "Unai Núñez",
+    "score": 0.800000011920929
+  },
+  "Jon Aramburu": {
+    "value": 15000000.0,
+    "matched_name": "Jon Aramburu",
+    "score": 1.0
+  },
+  "I. Lepinjica": {
+    "value": 300000.0,
+    "matched_name": "Lepinjica",
+    "score": 0.8571428656578064
+  },
+  "Pedro Diaz": {
+    "value": 3000000.0,
+    "matched_name": "Pedro Díaz",
+    "score": 0.8999999761581421
+  },
+  "I. Zubeldia": {
+    "value": 6000000.0,
+    "matched_name": "Zubeldia",
+    "score": 0.8421052694320679
+  },
+  "C. Matsima": {
+    "value": 22000000.0,
+    "matched_name": "Matsima",
+    "score": 0.8235294222831726
+  },
+  "Joel Monteiro": {
+    "value": 3500000.0,
+    "matched_name": "Joël Monteiro",
+    "score": 0.9230769276618958
+  },
+  "P. Hojbjerg": {
+    "value": 15000000.0,
+    "matched_name": "Højbjerg",
+    "score": 0.7368420958518982
+  },
+  "Kevin Diks": {
+    "value": 5000000.0,
+    "matched_name": "Kevin Diks",
+    "score": 1.0
+  },
+  "T. Chalobah": {
+    "value": 40000000.0,
+    "matched_name": "Chalobah",
+    "score": 0.8421052694320679
+  },
+  "Jan Gyamerah": {
+    "value": 1000000.0,
+    "matched_name": "Jan Bamert",
+    "score": 0.7272727489471436
+  },
+  "Ayoze Perez": {
+    "value": 5000000.0,
+    "matched_name": "Ayoze Pérez",
+    "score": 0.9090908765792847
+  },
+  "N. Haikin": {
+    "value": 3000000.0,
+    "matched_name": "Haikin",
+    "score": 0.800000011920929
+  },
+  "M. Mittelstadt": {
+    "value": 18000000.0,
+    "matched_name": "Mittelstädt",
+    "score": 0.800000011920929
+  },
+  "Matty Cash": {
+    "value": 22000000.0,
+    "matched_name": "Matty Cash",
+    "score": 1.0
+  },
+  "R. Calafiori": {
+    "value": 55000000.0,
+    "matched_name": "Calafiori",
+    "score": 0.8571428656578064
+  },
+  "J. Branthwaite": {
+    "value": 40000000.0,
+    "matched_name": "Branthwaite",
+    "score": 0.8799999952316284
+  },
+  "Moussa Sylla": {
+    "value": 1200000.0,
+    "matched_name": "Moussa Sylla",
+    "score": 1.0
+  },
+  "Javi Galan": {
+    "value": 1800000.0,
+    "matched_name": "Javi Galán",
+    "score": 0.8999999761581421
+  },
+  "M. De Cuyper": {
+    "value": 22000000.0,
+    "matched_name": "De Cuyper",
+    "score": 0.8571428656578064
+  },
+  "Andrei Ratiu": {
+    "value": 18000000.0,
+    "matched_name": "Andrei Rațiu",
+    "score": 0.9166666269302368
+  },
+  "L. Coulibaly": {
+    "value": 28000000.0,
+    "matched_name": "Coulibaly",
+    "score": 0.8571428656578064
+  },
+  "K. Ajer": {
+    "value": 18000000.0,
+    "matched_name": "Ajer",
+    "score": 0.7272727489471436
+  },
+  "M. Rohr": {
+    "value": 800000.0,
+    "matched_name": "Mohr",
+    "score": 0.7272727489471436
+  },
+  "M. Coulibaly": {
+    "value": 28000000.0,
+    "matched_name": "Coulibaly",
+    "score": 0.8571428656578064
+  },
+  "L. Pinckert": {
+    "value": 400000.0,
+    "matched_name": "Pijnaker",
+    "score": 0.6315789222717285
+  },
+  "Andres Garcia": {
+    "value": 6000000.0,
+    "matched_name": "Andrés García",
+    "score": 0.8461538553237915
+  },
+  "Mike Maignan": {
+    "value": 20000000.0,
+    "matched_name": "Mike Maignan",
+    "score": 1.0
+  },
+  "Ludovit Reis": {
+    "value": 3000000.0,
+    "matched_name": "Ludovit Reis",
+    "score": 1.0
+  },
+  "Frank Anguissa": {
+    "value": 15000000.0,
+    "matched_name": "Frank Anguissa",
+    "score": 1.0
+  },
+  "L. Mafouta": {
+    "value": 1000000.0,
+    "matched_name": "Mafouta",
+    "score": 0.8235294222831726
+  },
+  "Tyler Morton": {
+    "value": 30000000.0,
+    "matched_name": "Tyler Morton",
+    "score": 1.0
+  },
+  "S. Idumbo Muzambo": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "M. Nicolas": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Lamine Sy": {
+    "value": 2500000.0,
+    "matched_name": "Lamine Sy",
+    "score": 1.0
+  },
+  "Akim Zedadka": {
+    "value": 800000.0,
+    "matched_name": "Akim Zedadka",
+    "score": 1.0
+  },
+  "M. Vandevoordt": {
+    "value": 15000000.0,
+    "matched_name": "Vandevoordt",
+    "score": 0.8799999952316284
+  },
+  "Matheus Cunha": {
+    "value": 75000000.0,
+    "matched_name": "Matheus Cunha",
+    "score": 1.0
+  },
+  "J. Ekkelenkamp": {
+    "value": 10000000.0,
+    "matched_name": "Ekkelenkamp",
+    "score": 0.8799999952316284
+  },
+  "G. Hemmings": {
+    "value": 150000.0,
+    "matched_name": "Hemmings",
+    "score": 0.8421052694320679
+  },
+  "Demba Thiam": {
+    "value": 350000.0,
+    "matched_name": "Demba Thiam",
+    "score": 1.0
+  },
+  "G. Raspadori": {
+    "value": 22000000.0,
+    "matched_name": "Raspadori",
+    "score": 0.8571428656578064
+  },
+  "C. Augusto": {
+    "value": 250000.0,
+    "matched_name": "Augusto",
+    "score": 0.8235294222831726
+  },
+  "Oumar Ngom": {
+    "value": 3000000.0,
+    "matched_name": "Oumar Ngom",
+    "score": 1.0
+  },
+  "G. Donnarumma": {
+    "value": 45000000.0,
+    "matched_name": "Donnarumma",
+    "score": 0.8695651888847351
+  },
+  "Matias Soule": {
+    "value": 35000000.0,
+    "matched_name": "Matías Soulé",
+    "score": 0.8333333730697632
+  },
+  "Ridle Baku": {
+    "value": 12000000.0,
+    "matched_name": "Ridle Baku",
+    "score": 1.0
+  },
+  "M. Schwabe": {
+    "value": 300000.0,
+    "matched_name": "Schwab",
+    "score": 0.75
+  },
+  "A. Ait Boudlal": {
+    "value": 12000000.0,
+    "matched_name": "Ait Boudlal",
+    "score": 0.8799999952316284
+  },
+  "A. Thomasson": {
+    "value": 4000000.0,
+    "matched_name": "Thomasson",
+    "score": 0.8571428656578064
+  },
+  "Tete Morente": {
+    "value": 1800000.0,
+    "matched_name": "Tete Morente",
+    "score": 1.0
+  },
+  "F. Ivanovic": {
+    "value": 500000.0,
+    "matched_name": "Ivanovic",
+    "score": 0.8421052694320679
+  },
+  "Joe Scally": {
+    "value": 7000000.0,
+    "matched_name": "Joe Scally",
+    "score": 1.0
+  },
+  "K. Diawara": {
+    "value": 1500000.0,
+    "matched_name": "Diawara",
+    "score": 0.8235294222831726
+  },
+  "Daniel Cardenas": {
+    "value": 150000.0,
+    "matched_name": "Daniel Candeias",
+    "score": 0.8666666150093079
+  },
+  "Cucho Hernandez": {
+    "value": 18000000.0,
+    "matched_name": "Cucho Hernández",
+    "score": 0.9333333373069763
+  },
+  "A. Rrahmani": {
+    "value": 10000000.0,
+    "matched_name": "Rrahmani",
+    "score": 0.8421052694320679
+  },
+  "M. Akanji": {
+    "value": 17000000.0,
+    "matched_name": "Akanji",
+    "score": 0.800000011920929
+  },
+  "Bernd Leno": {
+    "value": 6000000.0,
+    "matched_name": "Bernd Leno",
+    "score": 1.0
+  },
+  "Wael Mohya": {
+    "value": 17000000.0,
+    "matched_name": "Wael Mohya",
+    "score": 1.0
+  },
+  "L. Poreba": {
+    "value": 2000000.0,
+    "matched_name": "Poreba",
+    "score": 0.800000011920929
+  },
+  "Eric Junior": {
+    "value": 2200000.0,
+    "matched_name": "Eric-Junior Bocat",
+    "score": 0.7142857313156128
+  },
+  "S. Dimitrievski": {
+    "value": 2000000.0,
+    "matched_name": "Dimitrievski",
+    "score": 0.8888888359069824
+  },
+  "Anton Stach": {
+    "value": 28000000.0,
+    "matched_name": "Anton Stach",
+    "score": 1.0
+  },
+  "A. Bermont": {
+    "value": 1000000.0,
+    "matched_name": "Bermont",
+    "score": 0.8235294222831726
+  },
+  "D. Larrubia": {
+    "value": 250000.0,
+    "matched_name": "De Lucia",
+    "score": 0.6315789222717285
+  },
+  "Pierre Ganiou": {
+    "value": 200000.0,
+    "matched_name": "Pierre Sagna",
+    "score": 0.7200000286102295
+  },
+  "Lewie Coyle": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "Kaishu Sano": {
+    "value": 40000000.0,
+    "matched_name": "Kaishu Sano",
+    "score": 1.0
+  },
+  "T. Muharemovic": {
+    "value": 25000000.0,
+    "matched_name": "Muharemović",
+    "score": 0.800000011920929
+  },
+  "G. Martin": {
+    "value": 200000.0,
+    "matched_name": "Gil Martins",
+    "score": 0.800000011920929
+  },
+  "Marc Roca": {
+    "value": 4000000.0,
+    "matched_name": "Marc Roca",
+    "score": 1.0
+  },
+  "A. Garcia": {
+    "value": 1500000.0,
+    "matched_name": "Garcia",
+    "score": 0.800000011920929
+  },
+  "Cesar Tarrega": {
+    "value": 9000000.0,
+    "matched_name": "César Tárrega",
+    "score": 0.8461538553237915
+  },
+  "Nahuel Noll": {
+    "value": 500000.0,
+    "matched_name": "Nahuel Noll",
+    "score": 1.0
+  },
+  "Fares Chaibi": {
+    "value": 15000000.0,
+    "matched_name": "Farès Chaïbi",
+    "score": 0.8333333730697632
+  },
+  "N. Mazraoui": {
+    "value": 18000000.0,
+    "matched_name": "Mazraoui",
+    "score": 0.8421052694320679
+  },
+  "Noah Okafor": {
+    "value": 25000000.0,
+    "matched_name": "Noah Okafor",
+    "score": 1.0
+  },
+  "Z. Van Den Bosch": {
+    "value": 6000000.0,
+    "matched_name": "Van Den Bosch",
+    "score": 0.8965517282485962
+  },
+  "Jesus Areso": {
+    "value": 5000000.0,
+    "matched_name": "Jesús Areso",
+    "score": 0.9090908765792847
+  },
+  "A. Obispo": {
+    "value": 4000000.0,
+    "matched_name": "Obispo",
+    "score": 0.800000011920929
+  },
+  "M. Skriniar": {
+    "value": 10000000.0,
+    "matched_name": "Škriniar",
+    "score": 0.7368420958518982
+  },
+  "R. van Bommel": {
+    "value": 10000000.0,
+    "matched_name": "van Bommel",
+    "score": 0.8695651888847351
+  },
+  "M. Rashford": {
+    "value": 40000000.0,
+    "matched_name": "Rashford",
+    "score": 0.8421052694320679
+  },
+  "Bruno Fernandes": {
+    "value": 35000000.0,
+    "matched_name": "Bruno Fernandes",
+    "score": 1.0
+  },
+  "Veljko Simic": {
+    "value": 750000.0,
+    "matched_name": "Veljko Simic",
+    "score": 1.0
+  },
+  "L. Amatucci": {
+    "value": 1000000.0,
+    "matched_name": "Amatucci",
+    "score": 0.8421052694320679
+  },
+  "Yoane Wissa": {
+    "value": 25000000.0,
+    "matched_name": "Yoane Wissa",
+    "score": 1.0
+  },
+  "Jonny": {
+    "value": 300000.0,
+    "matched_name": "Jony",
+    "score": 0.8888888359069824
+  },
+  "Semi Ajayi": {
+    "value": 700000.0,
+    "matched_name": "Semi Ajayi",
+    "score": 1.0
+  },
+  "J. Torunarigha": {
+    "value": 4000000.0,
+    "matched_name": "Torunarigha",
+    "score": 0.8799999952316284
+  },
+  "Jean Butez": {
+    "value": 8000000.0,
+    "matched_name": "Jean Butez",
+    "score": 1.0
+  },
+  "S. Camello": {
+    "value": 3000000.0,
+    "matched_name": "Camello",
+    "score": 0.8235294222831726
+  },
+  "Pavel Sulc": {
+    "value": 20000000.0,
+    "matched_name": "Pavel Sulc",
+    "score": 1.0
+  },
+  "Mile Svilar": {
+    "value": 35000000.0,
+    "matched_name": "Mile Svilar",
+    "score": 1.0
+  },
+  "Pedro Porro": {
+    "value": 35000000.0,
+    "matched_name": "Pedro Porro",
+    "score": 1.0
+  },
+  "Adam Daghim": {
+    "value": 7500000.0,
+    "matched_name": "Adam Daghim",
+    "score": 1.0
+  },
+  "R. Bentancur": {
+    "value": 20000000.0,
+    "matched_name": "Bentancur",
+    "score": 0.8571428656578064
+  },
+  "Y. Zabiri": {
+    "value": 9000000.0,
+    "matched_name": "Zabiri",
+    "score": 0.800000011920929
+  },
+  "A. Deiola": {
+    "value": 1500000.0,
+    "matched_name": "Deiola",
+    "score": 0.800000011920929
+  },
+  "J. Schingtienne": {
+    "value": 2000000.0,
+    "matched_name": "Schingtienne",
+    "score": 0.8888888359069824
+  },
+  "F. Rieder": {
+    "value": 12000000.0,
+    "matched_name": "Rieder",
+    "score": 0.800000011920929
+  },
+  "L. Calodat": {
+    "value": 100000.0,
+    "matched_name": "Calodat",
+    "score": 0.8235294222831726
+  },
+  "Malick Thiaw": {
+    "value": 45000000.0,
+    "matched_name": "Malick Thiaw",
+    "score": 1.0
+  },
+  "F. Kadioglu": {
+    "value": 25000.0,
+    "matched_name": "Kascioglu",
+    "score": 0.699999988079071
+  },
+  "G. Fabbian": {
+    "value": 10000000.0,
+    "matched_name": "Fabbian",
+    "score": 0.8235294222831726
+  },
+  "N. Kocik": {
+    "value": 1000000.0,
+    "matched_name": "Kovacik",
+    "score": 0.6666666269302368
+  },
+  "M. Soriano Carreno": {
+    "value": 3000000.0,
+    "matched_name": "Sergio Barreto",
+    "score": 0.625
+  },
+  "J. Grealish": {
+    "value": 20000000.0,
+    "matched_name": "Grealish",
+    "score": 0.8421052694320679
+  },
+  "Chuki": {
+    "value": 4000000.0,
+    "matched_name": "Chuki",
+    "score": 1.0
+  },
+  "Felix Nmecha": {
+    "value": 50000000.0,
+    "matched_name": "Felix Nmecha",
+    "score": 1.0
+  },
+  "I. Arguibide Goni": {
+    "value": 800000.0,
+    "matched_name": "Arguibide",
+    "score": 0.6923076510429382
+  },
+  "G. Suazo": {
+    "value": 6000000.0,
+    "matched_name": "Suazo",
+    "score": 0.7692307829856873
+  },
+  "M. Talbi": {
+    "value": 25000000.0,
+    "matched_name": "Talbi",
+    "score": 0.7692307829856873
+  },
+  "Jorrel Hato": {
+    "value": 40000000.0,
+    "matched_name": "Jorrel Hato",
+    "score": 1.0
+  },
+  "K. De Winter": {
+    "value": 23000000.0,
+    "matched_name": "De Winter",
+    "score": 0.8571428656578064
+  },
+  "P. Schick": {
+    "value": 18000000.0,
+    "matched_name": "Schick",
+    "score": 0.800000011920929
+  },
+  "V. Rongier": {
+    "value": 8000000.0,
+    "matched_name": "Rongier",
+    "score": 0.8235294222831726
+  },
+  "Fabio Vieira": {
+    "value": 18000000.0,
+    "matched_name": "Fábio Vieira",
+    "score": 0.9166666269302368
+  },
+  "Adam Smith": {
+    "value": 300000.0,
+    "matched_name": "Adam Smith",
+    "score": 1.0
+  },
+  "H. Behrens": {
+    "value": 5000000.0,
+    "matched_name": "Behrens",
+    "score": 0.8235294222831726
+  },
+  "Tiago Gabriel": {
+    "value": 15000000.0,
+    "matched_name": "Tiago Gabriel",
+    "score": 1.0
+  },
+  "Z. Athekame": {
+    "value": 15000000.0,
+    "matched_name": "Athekame",
+    "score": 0.8421052694320679
+  },
+  "Eric Garcia": {
+    "value": 40000000.0,
+    "matched_name": "Eric García",
+    "score": 0.9090908765792847
+  },
+  "Luis Diaz": {
+    "value": 70000000.0,
+    "matched_name": "Luis Díaz",
+    "score": 0.8888888359069824
+  },
+  "M. Olise": {
+    "value": 150000000.0,
+    "matched_name": "Olise",
+    "score": 0.7692307829856873
+  },
+  "A. Khalaili": {
+    "value": 23000000.0,
+    "matched_name": "Khalaili",
+    "score": 0.8421052694320679
+  },
+  "N. Williams": {
+    "value": 800000.0,
+    "matched_name": "Noa Williams",
+    "score": 0.8695651888847351
+  },
+  "J. De Lange": {
+    "value": 2500000.0,
+    "matched_name": "de Lange",
+    "score": 0.7368420958518982
+  },
+  "P. Masini": {
+    "value": 4200000.0,
+    "matched_name": "Masini",
+    "score": 0.800000011920929
+  },
+  "Gregor Kobel": {
+    "value": 40000000.0,
+    "matched_name": "Gregor Kobel",
+    "score": 1.0
+  },
+  "Romeo Lavia": {
+    "value": 22000000.0,
+    "matched_name": "Roméo Lavia",
+    "score": 0.9090908765792847
+  },
+  "Angel Perez": {
+    "value": 3000000.0,
+    "matched_name": "Ángel Pérez",
+    "score": 0.8181818127632141
+  },
+  "Alex Baena": {
+    "value": 40000000.0,
+    "matched_name": "Álex Baena",
+    "score": 0.8999999761581421
+  },
+  "A. Herrero": {
+    "value": 300000.0,
+    "matched_name": "Herrero",
+    "score": 0.8235294222831726
+  },
+  "J. Karlstrom": {
+    "value": 4000000.0,
+    "matched_name": "Karlström",
+    "score": 0.761904776096344
+  },
+  "E. Lulli": {
+    "value": 50000.0,
+    "matched_name": "Lulli",
+    "score": 0.7692307829856873
+  },
+  "O. Blomberg": {
+    "value": 3500000.0,
+    "matched_name": "Blomberg",
+    "score": 0.8421052694320679
+  },
+  "D. Jurasek": {
+    "value": 800000.0,
+    "matched_name": "Djurasek",
+    "score": 0.7777777910232544
+  },
+  "Kaito Mizuta": {
+    "value": 225000.0,
+    "matched_name": "Kaito Mizuta",
+    "score": 1.0
+  },
+  "Ilyas Azizi": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "G. Vicario": {
+    "value": 18000000.0,
+    "matched_name": "Vicario",
+    "score": 0.8235294222831726
+  },
+  "Jeff Chabot": {
+    "value": 15000000.0,
+    "matched_name": "Jeff Chabot",
+    "score": 1.0
+  },
+  "S. Guirassy": {
+    "value": 32000000.0,
+    "matched_name": "Guirassy",
+    "score": 0.8421052694320679
+  },
+  "A. Lopes": {
+    "value": 3000000.0,
+    "matched_name": "Lopes",
+    "score": 0.7692307829856873
+  },
+  "G. Reyna": {
+    "value": 4000000.0,
+    "matched_name": "Reyna",
+    "score": 0.7692307829856873
+  },
+  "Nico Paz": {
+    "value": 80000000.0,
+    "matched_name": "Nico Paz",
+    "score": 1.0
+  },
+  "O. Vlachodimos": {
+    "value": 3000000.0,
+    "matched_name": "Vlachodimos",
+    "score": 0.8799999952316284
+  },
+  "Yasin Ayari": {
+    "value": 35000000.0,
+    "matched_name": "Yasin Ayari",
+    "score": 1.0
+  },
+  "Jack Rudoni": {
+    "value": 50000.0,
+    "matched_name": "Jack Ruddy",
+    "score": 0.761904776096344
+  },
+  "Kerem Akturkoglu": {
+    "value": 20000000.0,
+    "matched_name": "Kerem Aktürkoğlu",
+    "score": 0.875
+  },
+  "M. Sangare": {
+    "value": 200000.0,
+    "matched_name": "Mo Sangare",
+    "score": 0.8999999761581421
+  },
+  "Livan Burcu": {
+    "value": 4000000.0,
+    "matched_name": "Livan Burcu",
+    "score": 1.0
+  },
+  "Joaquin Munoz": {
+    "value": 1000000.0,
+    "matched_name": "Joaquín Muñoz",
+    "score": 0.8461538553237915
+  },
+  "C. Kabasele": {
+    "value": 750000.0,
+    "matched_name": "Kabasele",
+    "score": 0.8421052694320679
+  },
+  "A. Lauriente": {
+    "value": 19000000.0,
+    "matched_name": "Laurienté",
+    "score": 0.761904776096344
+  },
+  "J. Vagnoman": {
+    "value": 10000000.0,
+    "matched_name": "Vagnoman",
+    "score": 0.8421052694320679
+  },
+  "M. Abdelmonem": {
+    "value": 2500000.0,
+    "matched_name": "Abdelmonem",
+    "score": 0.8695651888847351
+  },
+  "H. Bellerin": {
+    "value": 2400000.0,
+    "matched_name": "Bellerín",
+    "score": 0.7368420958518982
+  },
+  "Inigo Vicente": {
+    "value": 1800000.0,
+    "matched_name": "Iñigo Vicente",
+    "score": 0.9230769276618958
+  },
+  "M. Krattenmacher": {
+    "value": 3500000.0,
+    "matched_name": "Krattenmacher",
+    "score": 0.8965517282485962
+  },
+  "D. Karim": {
+    "value": 2500000.0,
+    "matched_name": "Karim",
+    "score": 0.7692307829856873
+  },
+  "P. Beach": {
+    "value": 1000000.0,
+    "matched_name": "Beach",
+    "score": 0.7692307829856873
+  },
+  "V. Livramento": {
+    "value": 45000000.0,
+    "matched_name": "Livramento",
+    "score": 0.8695651888847351
+  },
+  "Rodrigo Mora": {
+    "value": 38000000.0,
+    "matched_name": "Rodrigo Mora",
+    "score": 1.0
+  },
+  "Thomas Lemar": {
+    "value": 1800000.0,
+    "matched_name": "Thomas Lemar",
+    "score": 1.0
+  },
+  "T. Puchacz": {
+    "value": 1500000.0,
+    "matched_name": "Puchacz",
+    "score": 0.8235294222831726
+  },
+  "Ricardo Pepi": {
+    "value": 30000000.0,
+    "matched_name": "Ricardo Pepi",
+    "score": 1.0
+  },
+  "Leif Davis": {
+    "value": 20000000.0,
+    "matched_name": "Leif Davis",
+    "score": 1.0
+  },
+  "Kevin Schade": {
+    "value": 35000000.0,
+    "matched_name": "Kevin Schade",
+    "score": 1.0
+  },
+  "Raul Moro": {
+    "value": 3500000.0,
+    "matched_name": "Raúl Moro",
+    "score": 0.8888888359069824
+  },
+  "Ludovic Blas": {
+    "value": 10000000.0,
+    "matched_name": "Ludovic Blas",
+    "score": 1.0
+  },
+  "Simon Ebonog": {
+    "value": 4500000.0,
+    "matched_name": "Simon Ebonog",
+    "score": 1.0
+  },
+  "Enzo Koffi": {
+    "value": 1800000.0,
+    "matched_name": "Enzo Koffi",
+    "score": 1.0
+  },
+  "H. Magnetti": {
+    "value": 6000000.0,
+    "matched_name": "Magnetti",
+    "score": 0.8421052694320679
+  },
+  "N. Barella": {
+    "value": 50000000.0,
+    "matched_name": "Barella",
+    "score": 0.8235294222831726
+  },
+  "W. Burger": {
+    "value": 20000000.0,
+    "matched_name": "Burger",
+    "score": 0.800000011920929
+  },
+  "Nicolas Capaldo": {
+    "value": 8000000.0,
+    "matched_name": "Nicolás Capaldo",
+    "score": 0.9333333373069763
+  },
+  "M. Bidstrup": {
+    "value": 13000000.0,
+    "matched_name": "Bidstrup",
+    "score": 0.8421052694320679
+  },
+  "A. Haidara": {
+    "value": 5000000.0,
+    "matched_name": "Haidara",
+    "score": 0.8235294222831726
+  },
+  "C. Ordonez": {
+    "value": 350000.0,
+    "matched_name": "Crone",
+    "score": 0.6666666269302368
+  },
+  "G. Calvani": {
+    "value": 150000.0,
+    "matched_name": "Calvani",
+    "score": 0.8235294222831726
+  },
+  "R. Nicolaisen": {
+    "value": 5000000.0,
+    "matched_name": "Nicolaisen",
+    "score": 0.8695651888847351
+  },
+  "A. Sima": {
+    "value": 5000000.0,
+    "matched_name": "Sima",
+    "score": 0.7272727489471436
+  },
+  "S. Bornauw": {
+    "value": 8000000.0,
+    "matched_name": "Bornauw",
+    "score": 0.8235294222831726
+  },
+  "Antonio Nusa": {
+    "value": 32000000.0,
+    "matched_name": "Antonio Nusa",
+    "score": 1.0
+  },
+  "B. Andre": {
+    "value": 5000000.0,
+    "matched_name": "Andrew",
+    "score": 0.7142857313156128
+  },
+  "F. Torres": {
+    "value": 50000000.0,
+    "matched_name": "Torres",
+    "score": 0.800000011920929
+  },
+  "L. Vuskovic": {
+    "value": 60000000.0,
+    "matched_name": "Vuskovic",
+    "score": 0.8421052694320679
+  },
+  "J. Hauge": {
+    "value": 12000000.0,
+    "matched_name": "Hauge",
+    "score": 0.7692307829856873
+  },
+  "Matz Sels": {
+    "value": 3500000.0,
+    "matched_name": "Matz Sels",
+    "score": 1.0
+  },
+  "L. Ajorque": {
+    "value": 3000000.0,
+    "matched_name": "Ajorque",
+    "score": 0.8235294222831726
+  },
+  "F. Jorgensen": {
+    "value": 15000000.0,
+    "matched_name": "Jørgensen",
+    "score": 0.761904776096344
+  },
+  "A. Lookman": {
+    "value": 40000000.0,
+    "matched_name": "Lookman",
+    "score": 0.8235294222831726
+  },
+  "Enzo Ebosse": {
+    "value": 2800000.0,
+    "matched_name": "Enzo Ebosse",
+    "score": 1.0
+  },
+  "Angel Recio": {
+    "value": 3500000.0,
+    "matched_name": "Angelo Preciado",
+    "score": 0.7692307829856873
+  },
+  "Alex Calatrava": {
+    "value": 200000.0,
+    "matched_name": "Álex Calatrava",
+    "score": 0.9285714030265808
+  },
+  "N. Banks": {
+    "value": 20000000.0,
+    "matched_name": "Banks",
+    "score": 0.7692307829856873
+  },
+  "J. Romero": {
+    "value": 10000.0,
+    "matched_name": "Juan Romero",
+    "score": 0.800000011920929
+  },
+  "Anthony Caci": {
+    "value": 7000000.0,
+    "matched_name": "Anthony Caci",
+    "score": 1.0
+  },
+  "L. Martinez": {
+    "value": 250000.0,
+    "matched_name": "Martinez",
+    "score": 0.8421052694320679
+  },
+  "N'Golo Kante": {
+    "value": 4000000.0,
+    "matched_name": "N'Golo Kanté",
+    "score": 0.9166666269302368
+  },
+  "Samuel Isife": {
+    "value": 3500000.0,
+    "matched_name": "Samuel Isife",
+    "score": 1.0
+  },
+  "Josh Maja": {
+    "value": 5000000.0,
+    "matched_name": "Josh Maja",
+    "score": 1.0
+  },
+  "S. Cinquegrano": {
+    "value": null,
+    "matched_name": null,
+    "score": 0.0
+  },
+  "H. Maguire": {
+    "value": 8000000.0,
+    "matched_name": "Maguire",
+    "score": 0.8235294222831726
+  },
+  "R. Araujo": {
+    "value": 20000000.0,
+    "matched_name": "Araujo",
+    "score": 0.800000011920929
+  },
+  "A. Lokonga": {
+    "value": 12000000.0,
+    "matched_name": "Sambi Lokonga",
+    "score": 0.695652186870575
+  },
+  "Yvon Mvogo": {
+    "value": 2500000.0,
+    "matched_name": "Yvon Mvogo",
+    "score": 1.0
+  }
+}

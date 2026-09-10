@@ -46,19 +46,19 @@ POSITION_TO_INDEX = {"GK": 0, "DEF": 1, "MID": 2, "ATT": 3}
 
 @dataclass
 class LineupEncoderConfig:
-    player_embedding_dim: int = 32        # More capacity (was 16)
-    position_embedding_dim: int = 8       # More capacity (was 4)
-    hidden_dim: int = 64                  # Wider (was 32)
-    output_dim: int = 32                  # Richer embedding (was 16)
+    player_embedding_dim: int = 32
+    position_embedding_dim: int = 8
+    hidden_dim: int = 64
+    output_dim: int = 32
     max_players_per_team: int = 11
     epochs: int = 50
     batch_size: int = 512
-    learning_rate: float = 3e-4           # Lower for stability
+    learning_rate: float = 3e-4
     weight_decay: float = 1e-4
     dropout: float = 0.15
     seed: int = 42
-    attention_heads: int = 4              # More heads (was 2)
-    num_transformer_blocks: int = 2       # NEW: 2 blocks
+    attention_heads: int = 4
+    num_transformer_blocks: int = 2
     early_stopping_patience: int = 10
     lr_patience: int = 5
     lr_factor: float = 0.5
@@ -66,7 +66,7 @@ class LineupEncoderConfig:
 
 
 # ============================================================================
-# HELPERS (same as before)
+# HELPERS
 # ============================================================================
 
 def lineup_sort_key(column_name: str) -> tuple[int, int]:
@@ -229,11 +229,8 @@ class TransformerBlock(nn.Module):
         )
     
     def forward(self, x, position_indices, mask):
-        # Self-attention with residual
         attn_out = self.attention(x, position_indices, mask)
         x = self.norm1(x + attn_out)
-        
-        # Feed-forward with residual
         ffn_out = self.ffn(x)
         x = self.norm2(x + ffn_out)
         return x
@@ -245,34 +242,27 @@ class AttentionPooling(nn.Module):
     def __init__(self, hidden_dim, attention_heads=4, dropout=0.1):
         super().__init__()
         self.attention = MultiHeadAttention(hidden_dim, attention_heads, dropout)
-        # Simple weighted sum using learned query
         self.pool_query = nn.Parameter(torch.randn(1, 1, hidden_dim) * 0.02)
     
     def forward(self, x, position_indices, mask):
         batch_size, num_players, _ = x.shape
         
-        # Concatenate pool query
         pool_query = self.pool_query.expand(batch_size, -1, -1)
-        x_with_query = torch.cat([pool_query, x], dim=1)  # (batch, num_players+1, hidden_dim)
+        x_with_query = torch.cat([pool_query, x], dim=1)
         
-        # Extend mask for query (always attend to query)
         query_mask = torch.ones(batch_size, 1, device=mask.device)
         extended_mask = torch.cat([query_mask, mask], dim=1)
         
-        # Extend position indices for query (use GK as dummy)
         query_pos = torch.zeros(batch_size, 1, dtype=position_indices.dtype, device=position_indices.device)
         extended_pos = torch.cat([query_pos, position_indices], dim=1)
         
-        # Apply attention
         attended = self.attention(x_with_query, extended_pos, extended_mask)
-        
-        # Take the query position (first) as pooled representation
         pooled = attended[:, 0, :]
         return pooled
 
 
 # ============================================================================
-# IMPROVED ENCODER
+# ENCODER
 # ============================================================================
 
 class ImprovedLineupEncoder(nn.Module):
@@ -290,16 +280,13 @@ class ImprovedLineupEncoder(nn.Module):
         self.input_proj = nn.Linear(input_dim, config.hidden_dim)
         self.input_dropout = nn.Dropout(config.dropout)
         
-        # Multiple transformer blocks
         self.blocks = nn.ModuleList([
             TransformerBlock(config.hidden_dim, config.attention_heads, config.dropout)
             for _ in range(config.num_transformer_blocks)
         ])
         
-        # Final pooling
         self.pooling = AttentionPooling(config.hidden_dim, config.attention_heads, config.dropout)
         
-        # Output projection
         self.rho = nn.Sequential(
             nn.Linear(config.hidden_dim, config.hidden_dim // 2),
             nn.GELU(),
@@ -313,14 +300,10 @@ class ImprovedLineupEncoder(nn.Module):
         x = torch.cat([player_emb, position_emb], dim=-1)
         x = self.input_dropout(self.input_proj(x))
         
-        # Pass through transformer blocks
         for block in self.blocks:
             x = block(x, position_indices, mask)
         
-        # Pool
         pooled = self.pooling(x, position_indices, mask)
-        
-        # Output
         return self.rho(pooled)
 
 
@@ -345,7 +328,7 @@ class LineupGoalPredictor(nn.Module):
 
 
 # ============================================================================
-# DATASET (same as before)
+# DATASET
 # ============================================================================
 
 class LineupSupervisedDataset(Dataset):
@@ -568,6 +551,7 @@ def main():
     print(f"Saved improved lineup encoder to {STATE_DICT_PATH}")
     print(f"Saved training embeddings to {TRAIN_OUTPUT_PATH} ({train_output.shape})")
     print(f"Saved test embeddings to {TEST_OUTPUT_PATH} ({test_output.shape})")
+    print(f"Saved player vocabulary to {VOCAB_PATH}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,14 @@
+{
+  "hyperparameters": {
+    "learning_rate": 0.001,
+    "weight_decay": 0.001,
+    "dropout": 0.2,
+    "module_hidden_dim": 32,
+    "lineup_hidden_dim": 128,
+    "fusion_hidden_dim": 48,
+    "rate_head_hidden_dim": 32,
+    "outcome_weight": 1.5
+  },
+  "fusion_val_accuracy": 0.514018691588785,
+  "fusion_test_accuracy": 0.49859353023909986
+}

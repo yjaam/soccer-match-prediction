@@ -112,7 +112,7 @@ else:
 
 # Fetch data from API for FC25 and FC26
 api_data_list = []
-games = [('fc25', '1'), ('fc26', '1'), ('fc26', '2')]
+games = [('fc25', '1'), ('fc26', '1'), ('fc26', '2'), ('fc27', '1')]  # Add more as needed
 
 for game, update in games:
     fifa_num = game.replace('fc', '')

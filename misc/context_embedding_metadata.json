@@ -3469,6 +3469,6 @@
   "league_dim": 16,
   "season_dim": 16,
   "matchup_dim": 16,
-  "best_epoch": 4,
-  "best_test_loss": 2.9964787364006042
+  "best_epoch": 2,
+  "best_test_loss": 2.994298040866852
 }

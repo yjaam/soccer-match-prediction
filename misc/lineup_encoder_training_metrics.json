@@ -1,7 +1,7 @@
 {
-  "best_test_goal_nll": 2.932046413421631,
-  "best_epoch": 17,
-  "epochs_trained": 27,
+  "best_test_goal_nll": 2.932933211326599,
+  "best_epoch": 10,
+  "epochs_trained": 20,
   "architecture": "2_block_transformer_encoder",
   "num_transformer_blocks": 2,
   "attention_heads": 4,

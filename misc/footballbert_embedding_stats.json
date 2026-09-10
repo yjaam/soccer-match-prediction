@@ -1,0 +1,12 @@
+{
+  "repo_id": "achadj/footballbert-base",
+  "unique_player_names": 8419,
+  "matched_player_names": 7869,
+  "unmatched_player_names": 550,
+  "fuzzy_match_threshold": 90.0,
+  "raw_embedding_dim_per_side": 256,
+  "pca_embedding_dim_per_side": 32,
+  "pca_explained_variance": 0.5012913901120382,
+  "train_rows": 20775,
+  "test_rows": 1612
+}

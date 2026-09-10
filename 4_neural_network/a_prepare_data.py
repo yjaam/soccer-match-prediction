@@ -177,6 +177,13 @@ def _clean_module(
     train[feature_cols] = train[feature_cols].fillna(medians)
     test[feature_cols] = test[feature_cols].fillna(medians)
 
+    # Standardize using train-only stats (some modules, e.g. raw FootballBERT
+    # embeddings and raw match-stat features, are no longer PCA-scaled upstream).
+    feature_means = train[feature_cols].mean(numeric_only=True)
+    feature_stds = train[feature_cols].std(numeric_only=True).replace(0, 1.0).fillna(1.0)
+    train[feature_cols] = (train[feature_cols] - feature_means) / feature_stds
+    test[feature_cols] = (test[feature_cols] - feature_means) / feature_stds
+
     train = train[[key_col, "HG", "AG"] + feature_cols].copy()
     test = test[[key_col, "HG", "AG"] + feature_cols].copy()
 
@@ -189,6 +196,7 @@ def _clean_module(
         "rows_train_after": int(len(train)),
         "rows_test_after": int(len(test)),
         "feature_count": int(len(feature_cols)),
+        "standardized": True,
     }
 
     return train, test, feature_cols, stats

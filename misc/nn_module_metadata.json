@@ -74,7 +74,8 @@
       "rows_test_before": 1612,
       "rows_train_after": 20775,
       "rows_test_after": 1612,
-      "feature_count": 64
+      "feature_count": 64,
+      "standardized": true
     },
     "player_stats": {
       "key_col": "game_id",
@@ -94,7 +95,8 @@
       "rows_test_before": 1612,
       "rows_train_after": 20775,
       "rows_test_after": 1612,
-      "feature_count": 8
+      "feature_count": 8,
+      "standardized": true
     },
     "skill_matchups": {
       "key_col": "game_id",
@@ -118,23 +120,87 @@
       "rows_test_before": 1541,
       "rows_train_after": 19573,
       "rows_test_after": 1541,
-      "feature_count": 12
+      "feature_count": 12,
+      "standardized": true
     },
     "match_stats": {
       "key_col": "game_id",
       "feature_cols": [
-        "PC1",
-        "PC2",
-        "PC3",
-        "PC4"
+        "Home_possession",
+        "Away_possession",
+        "Home_passing_accuracy",
+        "Away_passing_accuracy",
+        "Home_shots_on_target",
+        "Away_shots_on_target",
+        "Home_saves",
+        "Away_saves",
+        "Home_cards",
+        "Away_cards",
+        "Home_fouls",
+        "Away_fouls",
+        "Home_corners",
+        "Away_corners",
+        "Home_crosses",
+        "Away_crosses",
+        "Home_touches",
+        "Away_touches",
+        "Home_tackles",
+        "Away_tackles",
+        "Home_interceptions",
+        "Away_interceptions",
+        "Home_aerials_won",
+        "Away_aerials_won",
+        "Home_clearances",
+        "Away_clearances",
+        "Home_offsides",
+        "Away_offsides",
+        "Home_goal_kicks",
+        "Away_goal_kicks",
+        "Home_throw_ins",
+        "Away_throw_ins",
+        "Home_long_balls",
+        "Away_long_balls",
+        "Home_assists",
+        "Home_pens_made",
+        "Home_pens_att",
+        "Home_shots",
+        "Home_cards_yellow",
+        "Home_cards_red",
+        "Home_fouled",
+        "Home_tackles_won",
+        "Home_own_goals",
+        "Home_pens_won",
+        "Home_pens_conceded",
+        "Away_assists",
+        "Away_pens_made",
+        "Away_pens_att",
+        "Away_shots",
+        "Away_cards_yellow",
+        "Away_cards_red",
+        "Away_fouled",
+        "Away_tackles_won",
+        "Away_own_goals",
+        "Away_pens_won",
+        "Away_pens_conceded",
+        "Home_keeper_gk_shots_on_target_against",
+        "Home_keeper_gk_goals_against",
+        "Home_keeper_gk_saves",
+        "Home_keeper_gk_save_pct",
+        "Away_keeper_gk_shots_on_target_against",
+        "Away_keeper_gk_goals_against",
+        "Away_keeper_gk_saves",
+        "Away_keeper_gk_save_pct",
+        "home_xg",
+        "away_xg"
       ],
       "train_file": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/final_data/nn_input_match_stats_TRAIN.csv",
       "test_file": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/final_data/nn_input_match_stats_TEST.csv",
-      "rows_train_before": 19474,
-      "rows_test_before": 1716,
-      "rows_train_after": 19462,
-      "rows_test_after": 1716,
-      "feature_count": 4
+      "rows_train_before": 20012,
+      "rows_test_before": 1756,
+      "rows_train_after": 19996,
+      "rows_test_after": 1756,
+      "feature_count": 66,
+      "standardized": true
     },
     "league": {
       "key_col": "game_id",
@@ -162,7 +228,8 @@
       "rows_test_before": 1612,
       "rows_train_after": 20775,
       "rows_test_after": 1612,
-      "feature_count": 16
+      "feature_count": 16,
+      "standardized": true
     },
     "season": {
       "key_col": "game_id",
@@ -190,7 +257,8 @@
       "rows_test_before": 1612,
       "rows_train_after": 20775,
       "rows_test_after": 1612,
-      "feature_count": 16
+      "feature_count": 16,
+      "standardized": true
     },
     "matchup": {
       "key_col": "game_id",
@@ -218,7 +286,8 @@
       "rows_test_before": 1612,
       "rows_train_after": 20775,
       "rows_test_after": 1612,
-      "feature_count": 16
+      "feature_count": 16,
+      "standardized": true
     }
   }
 }

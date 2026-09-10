@@ -10,10 +10,15 @@ numeric without using future information.
 
 PCA is fit only on seasons up to 2024-2025. The 2025-2026 season is held out as
 test data and transformed with the training PCA weights.
+
+NEW: The fitted PCA weights (per-group means, stds, first component vector) are
+saved to misc/player_statistics_pca_weights.json so the exact same
+transformation can be reapplied at inference time (dashboard).
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +33,9 @@ FINAL_DATA_DIR = PROJECT_DIR / "final_data"
 TRAIN_OUTPUT_PATH = FINAL_DATA_DIR / "player_statistics_pca_TRAIN.csv"
 TEST_OUTPUT_PATH = FINAL_DATA_DIR / "player_statistics_pca_TEST.csv"
 MISC_DIR = PROJECT_DIR / "misc"
+
+# NEW: where the fitted PCA transformation is persisted for inference reuse
+PCA_WEIGHTS_PATH = MISC_DIR / "player_statistics_pca_weights.json"
 
 
 GROUP_CONFIGS = {
@@ -349,6 +357,14 @@ def main() -> None:
     train_scores_map: dict[str, np.ndarray] = {}
     test_scores_map: dict[str, np.ndarray] = {}
 
+    # NEW: store per-group means / stds / first component for later reuse at inference time
+    pca_weights_export: dict = {
+        "feature_columns": feature_columns,
+        "date_column": date_column,
+        "team_columns": team_columns,
+        "groups": {},
+    }
+
     print("\n" + "=" * 60)
     print("PERFORMING PCA BY POSITION GROUP")
     print("=" * 60)
@@ -375,13 +391,25 @@ def main() -> None:
             }
         )
 
-        component = np.linalg.svd(
-            ((train_matrix - train_matrix.mean(axis=0)) / train_matrix.std(axis=0, ddof=0).replace(0, np.nan))
-            .fillna(0.0)
-            .to_numpy(dtype=float),
-            full_matrices=False,
-        )[2][0]
+        # Compute the fitted transformation consistently with fit_group_pca
+        train_means = train_matrix.mean(axis=0)
+        train_stds = train_matrix.std(axis=0, ddof=0).replace(0, np.nan)
+        train_scaled_for_loadings = (
+            (train_matrix - train_means) / train_stds
+        ).fillna(0.0).to_numpy(dtype=float)
+        component = np.linalg.svd(train_scaled_for_loadings, full_matrices=False)[2][0]
         loadings = pd.Series(component, index=group_cols)
+
+        # NEW: export the fitted transformation for this group
+        pca_weights_export["groups"][group_key] = {
+            "feature_columns": list(group_cols),
+            "means": {col: float(train_means[col]) for col in group_cols},
+            "stds": {
+                col: (float(train_stds[col]) if pd.notna(train_stds[col]) and train_stds[col] != 0 else 1.0)
+                for col in group_cols
+            },
+            "component": [float(x) for x in component.tolist()],
+        }
 
         top_features = loadings.abs().sort_values(ascending=False).head(3)
         print(f"  PC1 explained variance: {pc1_explained_variance:.3f} ({pc1_explained_variance * 100:.1f}%)")
@@ -410,6 +438,18 @@ def main() -> None:
                     "Abs_Loading": float(abs(loadings[feature])),
                 }
             )
+
+    # NEW: persist per-feature training means used as LOCF fallback at inference
+    locf_fallback_means = {}
+    for column in feature_columns:
+        col_values = pd.to_numeric(train_imputed[column], errors="coerce")
+        locf_fallback_means[column] = (
+            float(col_values.mean()) if col_values.notna().any() else 0.0
+        )
+    pca_weights_export["locf_fallback_means"] = locf_fallback_means
+
+    PCA_WEIGHTS_PATH.write_text(json.dumps(pca_weights_export, indent=2), encoding="utf-8")
+    print(f"\nSaved PCA weights for inference: {PCA_WEIGHTS_PATH}")
 
     train_output = pd.DataFrame({"game_id": train_imputed["game_id"].values})
     test_output = pd.DataFrame({"game_id": test_imputed["game_id"].values})

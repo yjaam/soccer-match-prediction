@@ -4,6 +4,8 @@ AC Ajaccio,ACA,home
 AC Carpi,CAR,home
 AC Milan,ACM,home
 AC Monza,MON,home
+AFC Bournemouth,BOU,home
+AJ Auxerre,AJA,home
 AS Monaco,ASM,home
 AS Nancy-Lorraine,NAN,home
 AS Saint-Étienne,STE,home
@@ -18,6 +20,7 @@ Bologna Football Club 1909,BOL,home
 Borussia Dortmund,BVB,home
 Brentford FC,BRE,home
 Brescia Calcio,BRE,home
+Brighton & Hove Albion,BHA,home
 Burnley FC,BUR,home
 CD Leganés,LEG,home
 Cagliari Calcio,CAG,home
@@ -26,6 +29,7 @@ Cesena FC,CES,home
 Chelsea FC,CHE,home
 Chievo Verona,CHI,home
 Clermont Foot 63,CLE,home
+Coventry City,COV,home
 Crystal Palace,CRY,home
 Cádiz CF,CAD,home
 Córdoba CF,COR,home
@@ -64,6 +68,7 @@ Hertha BSC,BSC,home
 Holstein Kiel,KSV,home
 Huddersfield Town,HUD,home
 Hull City,HUL,home
+Inter Milan,INT,home
 Ipswich Town,IPS,home
 Juventus FC,JUV,home
 Karlsruher SC,KSC,home
@@ -82,10 +87,12 @@ Nottingham Forest,NFO,home
 Nîmes Olympique,NIM,home
 Palermo FC,PAL,home
 Paris FC,PFC,home
+Paris Saint-Germain,PSG,home
 Parma Calcio 1913,PAR,home
 Pisa Sporting Club,PIS,home
 Queens Park Rangers,QPR,home
 RB Leipzig,RBL,home
+Racing Santander,RSA,home
 Rayo Vallecano,RAY,home
 Real Madrid,RMA,home
 Real Oviedo,OVI,home
@@ -98,6 +105,7 @@ SD Eibar,EIB,home
 SD Huesca,HUE,home
 SM Caen,CAE,home
 SPAL,SPA,home
+SV 07 Elversberg,ELV,home
 SV Darmstadt 98,D98,home
 Sevilla FC,SEV,home
 Sheffield United,SHU,home
@@ -112,6 +120,7 @@ Stoke City,STK,home
 Swansea City,SWA,home
 Thonon Évian Grand Genève FC,EVI,home
 Torino FC,TOR,home
+Tottenham Hotspur,TOT,home
 UC Sampdoria,SAM,home
 UD Almería,ALM,home
 UD Las Palmas,LPA,home
