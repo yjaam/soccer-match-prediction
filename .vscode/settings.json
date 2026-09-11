@@ -1,5 +1,11 @@
 {
     "chat.tools.terminal.autoApprove": {
         "uniq": true
-    }
+    },
+    "r.rterm.mac": "/usr/local/bin/R",
+    "r.rpath.mac": "/usr/local/bin/R",
+    "r.bracketedPaste": false,
+    "r.sessionWatcher": true,
+    "terminal.integrated.cwd": "${workspaceFolder}"
 }
+

@@ -15,3 +15,4 @@ scraperfc_data/*
 !scraperfc_data/.gitkeep
 transfermarkt_data/*
 !transfermarkt_data/.gitkeep
+misc/*

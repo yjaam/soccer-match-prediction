@@ -9,6 +9,8 @@ Differs from the historical script:
 - Never touches data/lineups.csv, data/lineups_values.csv, or
   data/lineups_values_ratings.csv (all training artifacts)
 - Uses the same FIFA matching algorithm + local cache
+- Prunes stale rows (e.g. Champions League fixtures filtered upstream)
+- Drops rows with invalid game_id before merging
 """
 
 import pandas as pd
@@ -68,18 +70,10 @@ POSITION_COLUMNS = {
 }
 
 FIFA_VERSION_DATES = {
-    15: datetime(2014, 9, 1),
-    16: datetime(2015, 9, 1),
-    17: datetime(2016, 9, 1),
-    18: datetime(2017, 9, 1),
-    19: datetime(2018, 9, 1),
-    20: datetime(2019, 9, 1),
-    21: datetime(2020, 10, 1),
-    22: datetime(2021, 10, 1),
-    23: datetime(2022, 9, 1),
-    24: datetime(2023, 9, 1),
-    25: datetime(2024, 9, 1),
-    26: datetime(2025, 9, 1),
+    15: datetime(2014, 9, 1), 16: datetime(2015, 9, 1), 17: datetime(2016, 9, 1),
+    18: datetime(2017, 9, 1), 19: datetime(2018, 9, 1), 20: datetime(2019, 9, 1),
+    21: datetime(2020, 10, 1), 22: datetime(2021, 10, 1), 23: datetime(2022, 9, 1),
+    24: datetime(2023, 9, 1), 25: datetime(2024, 9, 1), 26: datetime(2025, 9, 1),
 }
 
 
@@ -92,9 +86,23 @@ def get_fifa_version_for_date(match_date):
     return max(applicable_versions.keys())
 
 
+def _drop_invalid_game_ids(frame: pd.DataFrame, label: str) -> pd.DataFrame:
+    """Remove rows where game_id is missing, empty, or the literal string 'nan'."""
+    if 'game_id' not in frame.columns:
+        return frame
+    before = len(frame)
+    out = frame[frame['game_id'].notna()].copy()
+    out = out[out['game_id'].astype(str).str.strip() != ''].copy()
+    out = out[out['game_id'].astype(str).str.lower() != 'nan'].copy()
+    dropped = before - len(out)
+    if dropped > 0:
+        print(f"Dropped {dropped} rows with invalid game_id from {label}.")
+    return out
+
+
 def process_upcoming_fifa_ratings():
     # ------------------------------------------------------------------
-    # Paths — everything local to the dashboard folder except shared references
+    # Paths
     # ------------------------------------------------------------------
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_dir = os.path.dirname(script_dir)
@@ -103,12 +111,10 @@ def process_upcoming_fifa_ratings():
     prediction_data_dir = os.path.join(script_dir, "prediction_data")
     os.makedirs(prediction_data_dir, exist_ok=True)
 
-    # INPUTS (all local to dashboard OR shared read-only reference data)
     lineups_path = os.path.join(upcoming_dir, "upcoming_lineups_latest.csv")
     values_path = os.path.join(prediction_data_dir, "upcoming_lineups_values.csv")
     player_ratings_path = os.path.join(project_dir, "fifa_ratings", "player_ratings.csv")
 
-    # OUTPUT (local to dashboard)
     output_path = os.path.join(prediction_data_dir, "upcoming_lineups_values_ratings.csv")
     fifa_cache_path = os.path.join(prediction_data_dir, "fifa_name_cache.json")
 
@@ -155,17 +161,40 @@ def process_upcoming_fifa_ratings():
         else:
             raise KeyError("upcoming_lineups_values.csv must contain game_id or Date/Home Team/Away Team.")
 
+    # Drop rows with invalid game_id before anything else
+    df_lineups = _drop_invalid_game_ids(df_lineups, "upcoming_lineups_latest.csv")
+    df_values = _drop_invalid_game_ids(df_values, "upcoming_lineups_values.csv")
+
+    # Set of game_ids present in the *current* upstream inputs (as strings)
+    upstream_ids = set(df_values['game_id'].astype(str))
+
     # ------------------------------------------------------------------
-    # Incremental: skip game_ids already in output
+    # Incremental: prune stale rows from existing output, then skip already
+    # processed game_ids
     # ------------------------------------------------------------------
     df_existing = None
     processed_ids = set()
     if os.path.exists(output_path):
         df_existing = pd.read_csv(output_path, low_memory=False)
         if 'game_id' in df_existing.columns:
+            # Drop rows whose game_id is no longer upstream
+            before = len(df_existing)
+            stale_mask = ~df_existing['game_id'].astype(str).isin(upstream_ids)
+            stale_count = int(stale_mask.sum())
+            if stale_count > 0:
+                df_existing = df_existing.loc[~stale_mask].copy()
+                print(f"Pruned {stale_count} stale rows from existing output "
+                      f"(no longer present upstream).")
             processed_ids = set(df_existing['game_id'].dropna().astype(str))
 
-    df_values_pending = df_values[~df_values['game_id'].astype(str).isin(processed_ids)].copy()
+            # Persist pruned file immediately
+            df_existing.to_csv(output_path, index=False, encoding='utf-8-sig')
+
+    # Cast to string for both sides to avoid dtype mismatch on the merge
+    df_values['game_id'] = df_values['game_id'].astype(str)
+    df_lineups['game_id'] = df_lineups['game_id'].astype(str)
+
+    df_values_pending = df_values[~df_values['game_id'].isin(processed_ids)].copy()
     df_lineups_pending = df_lineups[df_lineups['game_id'].isin(df_values_pending['game_id'])].copy()
 
     print(f"Existing processed games: {len(processed_ids)}")
@@ -173,8 +202,8 @@ def process_upcoming_fifa_ratings():
 
     if df_values_pending.empty:
         if df_existing is not None:
-            df_existing.to_csv(output_path, index=False, encoding='utf-8-sig')
-            print("No pending games. Kept existing upcoming_lineups_values_ratings.csv.")
+            print("No pending games. Kept existing upcoming_lineups_values_ratings.csv "
+                  "(pruned if applicable).")
         else:
             print("No pending games and no existing output. Nothing to process.")
         return
@@ -212,7 +241,6 @@ def process_upcoming_fifa_ratings():
             fifa_lookups[fifa_ver][player_name] = row.to_dict()
         print(f"  Loaded FIFA {fifa_ver}: {len(fifa_lookups[fifa_ver])} players")
 
-    # Local cache (specific to dashboard)
     fifa_name_cache = {}
     if os.path.exists(fifa_cache_path):
         try:
@@ -318,7 +346,7 @@ def process_upcoming_fifa_ratings():
         fifa_version = get_fifa_version_for_date(match_date)
 
         match_summary = {
-            'game_id': row.get('game_id', ''),
+            'game_id': str(row.get('game_id', '')),
             'Date': row.get('Date', ''),
             'Home Team': row.get('Home Team', ''),
             'Away Team': row.get('Away Team', ''),
@@ -332,8 +360,15 @@ def process_upcoming_fifa_ratings():
 
     df_fifa_results = pd.DataFrame(fifa_results)
 
-    # Merge with values
+    # ------------------------------------------------------------------
+    # Merge with values (both sides now have game_id as str)
+    # ------------------------------------------------------------------
     print("Merging FIFA ratings with market values...")
+
+    df_values_pending = df_values_pending.copy()
+    df_values_pending['game_id'] = df_values_pending['game_id'].astype(str)
+    df_fifa_results['game_id'] = df_fifa_results['game_id'].astype(str)
+
     df_combined_new = pd.merge(df_values_pending, df_fifa_results, on='game_id',
                                 how='left', suffixes=('', '_fifa'))
 
@@ -350,9 +385,17 @@ def process_upcoming_fifa_ratings():
         df_combined = df_combined_new
 
     if 'game_id' in df_combined.columns:
+        df_combined['game_id'] = df_combined['game_id'].astype(str)
         df_combined = df_combined.drop_duplicates(subset=['game_id'], keep='first')
     if 'Date' in df_combined.columns:
         df_combined = df_combined.sort_values('Date').reset_index(drop=True)
+
+    # Defensive: ensure no game_ids outside the current upstream set survive
+    before_final = len(df_combined)
+    df_combined = df_combined[df_combined['game_id'].astype(str).isin(upstream_ids)].copy()
+    dropped = before_final - len(df_combined)
+    if dropped > 0:
+        print(f"Final cleanup: dropped {dropped} rows not present upstream.")
 
     df_combined.to_csv(output_path, index=False, encoding='utf-8-sig')
 

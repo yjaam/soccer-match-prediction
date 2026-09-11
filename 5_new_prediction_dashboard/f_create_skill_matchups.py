@@ -8,16 +8,17 @@ same-fixture match*. For upcoming fixtures, we do the same thing:
 1. For each upcoming home_team vs away_team pair, find the last historical
    meeting between those two teams.
 2. Reuse the skill matchup features (log-ratios) from that prior meeting.
-3. If no prior meeting exists, fall back to the most recent meeting of
-   the same fixture pair (via any side) — or, failing that, drop the row.
+3. If no prior meeting exists, produce a row with all-zero matchup features
+   (neutral / non-informative value for a log-ratio).
+4. Any residual NaN in the output is also replaced with 0.
 
 Reads:
     ./upcoming_lineups/upcoming_lineups_latest.csv
-    ./prediction_data/upcoming_lineups_values_ratings.csv
     ../data/player_group_before_pca.csv (historical reference, read-only)
 
 Writes:
     ./prediction_data/upcoming_skill_matchups.csv
+    ./prediction_data/upcoming_skill_matchups_with_meta.csv
 """
 
 import os
@@ -40,6 +41,7 @@ os.makedirs(prediction_data_dir, exist_ok=True)
 upcoming_path = os.path.join(upcoming_dir, "upcoming_lineups_latest.csv")
 historical_path = os.path.join(project_dir, "data", "player_group_before_pca.csv")
 output_path = os.path.join(prediction_data_dir, "upcoming_skill_matchups.csv")
+meta_path = os.path.join(prediction_data_dir, "upcoming_skill_matchups_with_meta.csv")
 
 
 # ============================================================================
@@ -75,6 +77,23 @@ REQUIRED_COLUMNS = [
     "AwayDefender_physic_Avg",
     "HomeGoalkeeper_goalkeeping_reflexes_Avg",
     "AwayGoalkeeper_goalkeeping_reflexes_Avg",
+]
+
+
+# The 12 output feature names, in a fixed order.
+FEATURE_NAMES = [
+    "home_attack_vs_away_defense",
+    "away_attack_vs_home_defense",
+    "home_attack_vs_away_goalkeeper",
+    "away_attack_vs_home_goalkeeper",
+    "home_midfield_vs_away_midfield",
+    "away_midfield_vs_home_midfield",
+    "home_midfield_vs_away_defense",
+    "away_midfield_vs_home_defense",
+    "home_attack_pace_vs_away_defense_pace",
+    "away_attack_pace_vs_home_defense_pace",
+    "home_attack_dribbling_vs_away_defense_physicality",
+    "away_attack_dribbling_vs_home_defense_physicality",
 ]
 
 
@@ -155,8 +174,6 @@ def main():
         raise KeyError("Historical data must have a 'Date' column.")
     if "game_id" not in historical.columns:
         raise KeyError("Historical data must have a 'game_id' column.")
-
-    # Ensure team columns are present
     if not {"Home Team", "Away Team"}.issubset(historical.columns):
         raise KeyError("Historical data must have 'Home Team' and 'Away Team' columns.")
 
@@ -180,7 +197,8 @@ def main():
     # ------------------------------------------------------------------
     print("\nLooking up last meeting for each upcoming fixture...")
     rows = []
-    no_history = 0
+    fixtures_with_history = 0
+    fixtures_without_history = 0
 
     for _, match in upcoming.iterrows():
         ht = match["Home Team"]
@@ -193,21 +211,31 @@ def main():
         ]
 
         if candidates.empty:
-            no_history += 1
-            print(f"  ⚠ No prior meeting: {ht} vs {at}")
+            # No prior meeting: emit a neutral row (all-zero matchup features)
+            fixtures_without_history += 1
+            row = {
+                "game_id": match["game_id"],
+                "Date": match["Date"],
+                "Home Team": ht,
+                "Away Team": at,
+                "_source_last_meeting_date": pd.NaT,
+                "_source_reversed": False,
+            }
+            for feat in FEATURE_NAMES:
+                row[feat] = 0.0
+            rows.append(row)
             continue
+
+        fixtures_with_history += 1
 
         last = candidates.sort_values("Date").iloc[-1]
         last_date = last["Date"]
 
-        # Build the required columns frame so we can reuse build_skill_matchup_features.
-        # To ensure the sign of the log-ratios corresponds to the *upcoming* fixture,
-        # we flip home/away columns if the historical meeting had reversed sides.
+        # Build feature source, flipping home/away if the historical meeting
+        # had reversed sides relative to the upcoming fixture.
         historical_was_reversed = (last["Home Team"] == at)
 
         if historical_was_reversed:
-            # Swap home/away feature columns so ratios are computed from
-            # the perspective of the CURRENT upcoming home team.
             swapped = {}
             for col in REQUIRED_COLUMNS:
                 if col.startswith("Home"):
@@ -217,12 +245,10 @@ def main():
                 else:
                     swapped_col = col
                 swapped[col] = last[swapped_col]
-
             feature_source = pd.DataFrame([swapped])
         else:
             feature_source = pd.DataFrame([last[REQUIRED_COLUMNS].to_dict()])
 
-        # Compute log-ratio features
         features = build_skill_matchup_features(feature_source).iloc[0].to_dict()
 
         row = {
@@ -237,10 +263,20 @@ def main():
         rows.append(row)
 
     if not rows:
-        print("\n⚠ No upcoming fixtures had a prior meeting. Nothing to save.")
+        print("\n⚠ No upcoming fixtures produced features. Nothing to save.")
         return
 
     out = pd.DataFrame(rows)
+
+    # ------------------------------------------------------------------
+    # Fill any remaining NaN in feature columns with 0
+    # (a log-ratio of 0 means "no differential" — neutral / non-informative)
+    # ------------------------------------------------------------------
+    feature_nan_before = int(out[FEATURE_NAMES].isna().sum().sum())
+    if feature_nan_before > 0:
+        out[FEATURE_NAMES] = out[FEATURE_NAMES].fillna(0.0)
+        print(f"\nFilled {feature_nan_before} residual NaN cells in feature columns "
+              f"with 0.0 (neutral log-ratio).")
 
     # ------------------------------------------------------------------
     # Report
@@ -249,32 +285,26 @@ def main():
     print(f"SKILL MATCHUP FEATURES (upcoming fixtures)")
     print(f"{'='*60}")
     print(f"Upcoming fixtures total:         {len(upcoming)}")
-    print(f"Fixtures with prior meeting:     {len(out)}")
-    print(f"Fixtures without prior meeting:  {no_history}")
+    print(f"  With prior meeting:            {fixtures_with_history}")
+    print(f"  Without prior meeting (zeros): {fixtures_without_history}")
+    print(f"Rows produced:                   {len(out)}")
 
-    # Show how recent the reference meetings were
+    # Show how recent the reference meetings were (for those that had one)
     if "_source_last_meeting_date" in out.columns:
-        out["_source_last_meeting_date"] = pd.to_datetime(
-            out["_source_last_meeting_date"], errors="coerce"
-        )
-        recent = out["_source_last_meeting_date"].max()
-        oldest = out["_source_last_meeting_date"].min()
-        print(f"Reference meeting date range:    {oldest.date()} → {recent.date()}")
+        dates = pd.to_datetime(out["_source_last_meeting_date"], errors="coerce").dropna()
+        if len(dates) > 0:
+            print(f"Reference meeting date range:    {dates.min().date()} → {dates.max().date()}")
 
-    # Show a sample
+    # Sample preview
     print(f"\nSample of upcoming fixtures with resolved matchups:")
     preview_cols = ["Date", "Home Team", "Away Team", "_source_last_meeting_date"]
-    preview = out[preview_cols].head(5)
-    print(preview.to_string(index=False))
+    print(out[preview_cols].head(5).to_string(index=False))
 
     # ------------------------------------------------------------------
-    # Save (drop internal columns for cleanliness, keep them optional)
+    # Save
     # ------------------------------------------------------------------
     out_clean = out.drop(columns=[c for c in out.columns if c.startswith("_")])
     out_clean.to_csv(output_path, index=False, encoding="utf-8-sig")
-
-    # Also save a "with metadata" version for audit/debug purposes
-    meta_path = os.path.join(prediction_data_dir, "upcoming_skill_matchups_with_meta.csv")
     out.to_csv(meta_path, index=False, encoding="utf-8-sig")
 
     print(f"\n[OK] Saved clean upcoming skill matchups to: {output_path}")

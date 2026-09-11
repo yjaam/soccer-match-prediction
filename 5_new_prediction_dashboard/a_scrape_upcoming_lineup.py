@@ -5,6 +5,9 @@
 
 The script lives in its own dashboard folder and writes outputs next to itself.
 It never touches the historical data/lineups.csv used for training.
+
+Fixtures from the Champions League (and any other non-Big-5 competition) are
+excluded, since the model was trained only on Big-5 league data.
 """
 
 import os
@@ -47,6 +50,10 @@ COMPETITION_STANDARDIZATION = {
     "Ligue 1": "ligue-1",
     "Champions League": "champions-league"
 }
+
+# Competitions that should never appear in the dashboard output — the model
+# is only trained on Big-5 league data.
+EXCLUDED_COMPETITIONS = {"champions-league"}
 
 
 def resolve_team_code(name: str):
@@ -249,6 +256,28 @@ def main():
     if df_scraped.empty:
         print("\nNo lineups found for any leagues. Nothing to save.")
         return
+
+    # --- Exclude non-Big-5 competitions (Champions League, etc.) ---
+    rows_before_filter = len(df_scraped)
+    excluded_mask = df_scraped["Competition"].isin(EXCLUDED_COMPETITIONS)
+    excluded_count = int(excluded_mask.sum())
+    if excluded_count > 0:
+        excluded_summary = (
+            df_scraped.loc[excluded_mask, "Competition"]
+            .value_counts()
+            .to_dict()
+        )
+        print(f"\nExcluding {excluded_count} non-Big-5 fixtures:")
+        for comp, n in excluded_summary.items():
+            print(f"  - {comp}: {n} matches")
+        df_scraped = df_scraped.loc[~excluded_mask].copy()
+
+    if df_scraped.empty:
+        print("\nAll scraped fixtures were excluded. Nothing to save.")
+        return
+
+    print(f"\nRetained {len(df_scraped)} fixtures after competition filter "
+          f"(started with {rows_before_filter}).")
 
     # --- Resolve team names to canonical codes ---
     df_scraped["Home Team Raw"] = df_scraped["Home Team"]

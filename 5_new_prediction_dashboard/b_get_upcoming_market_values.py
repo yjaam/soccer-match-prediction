@@ -192,6 +192,14 @@ def process_upcoming_lineup_values():
     if os.path.exists(output_path):
         df_existing = pd.read_csv(output_path, low_memory=False)
         if 'game_id' in df_existing.columns:
+            # Keep only rows whose game_id still exists upstream
+            upstream_ids = set(df_lineups['game_id'].astype(str))
+            before = len(df_existing)
+            df_existing = df_existing[df_existing['game_id'].astype(str).isin(upstream_ids)].copy()
+            pruned = before - len(df_existing)
+            if pruned > 0:
+                print(f"Pruned {pruned} stale rows from existing output "
+                      f"(no longer present in upstream lineups).")
             processed_ids = set(df_existing['game_id'].dropna().astype(str))
 
     df_pending = df_lineups[~df_lineups['game_id'].astype(str).isin(processed_ids)].copy()
