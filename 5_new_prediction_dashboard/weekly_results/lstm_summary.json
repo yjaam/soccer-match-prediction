@@ -1,5 +1,6 @@
 {
-  "run_date": "2026-09-11T17:31:51",
+  "run_date": "2026-09-12T14:10:42",
+  "matchday_anchor": "2026-09-07",
   "config": {
     "modules": [
       "lineup",
@@ -207,9 +208,10 @@
   ],
   "best_epoch": 18,
   "output_files": {
-    "dated_weekly": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/5_new_prediction_dashboard/weekly_results/weekly_predictions_2026-09-11.csv",
+    "dated_weekly": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/5_new_prediction_dashboard/weekly_results/weekly_predictions_2026-09-07.csv",
     "latest_weekly": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/5_new_prediction_dashboard/weekly_results/weekly_predictions_latest.csv",
     "raw_predictions": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/5_new_prediction_dashboard/weekly_results/lstm_predictions.csv",
     "model": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/5_new_prediction_dashboard/weekly_results/lstm_model.pt"
-  }
+  },
+  "played": 4
 }

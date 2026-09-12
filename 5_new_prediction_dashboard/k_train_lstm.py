@@ -1,32 +1,34 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Train the LSTM on the DASHBOARD data and produce weekly predictions.
+"""Train the LSTM on the DASHBOARD data and save model + raw predictions.
 
 Reads:
     ./nn_input_data/nn_input_*_TRAIN.csv   (full history)
     ./nn_input_data/nn_input_*_TEST.csv    (current upcoming fixtures)
     ./nn_input_data/nn_module_metadata.json
-    ./upcoming_lineups/upcoming_lineups_latest.csv
-    ../data/big5_matches_fixed.csv         (fallback for league resolution)
 
-Writes (weekly_results/ — append-only history):
-    lstm_model.pt                              (always the latest model)
-    lstm_summary.json                          (always the latest summary)
-    lstm_predictions.csv                       (always the latest raw predictions)
-    weekly_predictions_latest.csv              (always the newest clean summary)
-    weekly_predictions_YYYY-MM-DD.csv          (one per matchday/run)
+Writes (weekly_results/):
+    lstm_model.pt                (always the latest model)
+    lstm_predictions.csv         (always the latest raw predictions)
+
+For the dashboard-facing files (weekly_predictions_latest.csv,
+weekly_predictions_YYYY-MM-DD.csv, lstm_summary.json), run
+l_prepare_shiny_data.py afterwards.
+
+Shared helpers (config, model, data loaders, league resolution, actual-results
+lookup, etc.) are defined here and re-used by l_prepare_shiny_data.py via
+`import k_train_lstm`.
 """
 
 from __future__ import annotations
 
 import json
 import re
-import shutil
 import sys
 import unicodedata
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -40,7 +42,6 @@ from sklearn.metrics import (
     balanced_accuracy_score,
     confusion_matrix,
     f1_score,
-    precision_recall_fscore_support,
 )
 
 
@@ -71,14 +72,12 @@ DEFAULT_MODULES = ["lineup", "player_stats", "skill_matchups", "match_stats",
 
 OUTCOME_LABEL = {0: "HOME_WIN", 1: "DRAW", 2: "AWAY_WIN"}
 
-# Historical league label → standardized tag (used by scraper)
 LEAGUE_TAG_MAP = {
     "England Premier League": "premier-league",
     "France Ligue 1": "ligue-1",
     "Germany Bundesliga": "bundesliga",
     "Italy Serie A": "serie-a",
     "Spain La Liga": "laliga",
-    # Already-standardized fallbacks
     "premier-league": "premier-league",
     "ligue-1": "ligue-1",
     "bundesliga": "bundesliga",
@@ -86,7 +85,6 @@ LEAGUE_TAG_MAP = {
     "laliga": "laliga",
 }
 
-# Human-readable display names for the weekly CSV
 LEAGUE_DISPLAY = {
     "premier-league": "Premier League",
     "bundesliga": "Bundesliga",
@@ -94,6 +92,9 @@ LEAGUE_DISPLAY = {
     "serie-a": "Serie A",
     "ligue-1": "Ligue 1",
 }
+
+# Columns that hold post-match ground truth in weekly_predictions_*.csv.
+ACTUAL_COLS = ["actual_home_goals", "actual_away_goals", "actual_outcome"]
 
 
 @dataclass
@@ -128,29 +129,66 @@ class LSTMConfig:
     seed: int = 42
 
 
+@dataclass
+class TrainedModel:
+    """Everything downstream scripts need from a training run."""
+    model: LSTMMatchModel
+    config: LSTMConfig
+    home_cols: list[str]
+    away_cols: list[str]
+    other_cols: list[str]
+    home_prior: float
+    away_prior: float
+    draw_margin: float
+    blend_weight: float
+    train_priors: np.ndarray
+    best_epoch: int
+    n_params: int
+    val_balanced_accuracy: float
+    test_keys: list[str]
+    test_home_pred: np.ndarray
+    test_away_pred: np.ndarray
+    test_blend_probs: np.ndarray
+    test_blend_pred: np.ndarray
+    test_df: pd.DataFrame
+    val_outcomes: np.ndarray
+    sweep_results: list[dict]
+
+
 # ============================================================================
 # HELPERS
 # ============================================================================
 
-def dated_output_paths(base_dir: Path, run_date: datetime | None = None):
-    """
-    Return (dated_path, latest_path) for the weekly predictions.
+def matchday_anchor_date(game_ids, fallback: datetime | None = None) -> datetime:
+    """Return the Monday of the matchday week for the given game_ids."""
+    if fallback is None:
+        fallback = datetime.now()
 
-        dated_path  = base_dir / f"weekly_predictions_{YYYY-MM-DD}.csv"
-        latest_path = base_dir / "weekly_predictions_latest.csv"
-    """
-    if run_date is None:
-        run_date = datetime.now()
-    stamp = run_date.strftime("%Y-%m-%d")
+    dates: list[datetime] = []
+    for gid in game_ids:
+        if not isinstance(gid, str) or len(gid) < 8:
+            continue
+        try:
+            dates.append(datetime.strptime(gid[:8], "%Y%m%d"))
+        except ValueError:
+            continue
+
+    anchor = min(dates) if dates else fallback
+    return anchor - timedelta(days=anchor.weekday())
+
+
+def dated_output_paths(base_dir: Path,
+                       game_ids=None,
+                       run_date: datetime | None = None):
+    """Return (dated_path, latest_path) using the matchday anchor as the stamp."""
+    anchor = matchday_anchor_date(game_ids if game_ids is not None else [],
+                                  fallback=run_date)
+    stamp = anchor.strftime("%Y-%m-%d")
     return (
         base_dir / f"weekly_predictions_{stamp}.csv",
         base_dir / "weekly_predictions_latest.csv",
     )
 
-
-# ============================================================================
-# DATA LOADING
-# ============================================================================
 
 def set_seed(seed):
     np.random.seed(seed)
@@ -163,6 +201,10 @@ def load_module_meta():
         raise FileNotFoundError(f"Missing metadata file {META_PATH}.")
     return json.loads(META_PATH.read_text(encoding="utf-8"))
 
+
+# ============================================================================
+# DATA LOADING
+# ============================================================================
 
 def _load_split_frame(module_name, split):
     path = NN_INPUT_DATA_DIR / f"nn_input_{module_name}_{split}.csv"
@@ -352,18 +394,15 @@ def resolve_league_for_game(game_id, league_lookup, team_to_league):
       3. infer_league_and_season (legacy)
       4. "unknown"
     """
-    # 1. Scraper tag
     league = league_lookup.get(game_id)
     if league:
         return league
 
-    # 2. Team code lookup
     home_code, away_code = extract_team_codes_from_game_id(game_id)
     for code in (home_code, away_code):
         if code and code in team_to_league:
             return team_to_league[code]
 
-    # 3. Legacy fallback
     try:
         from src.game_id_context import infer_league_and_season
         ctx = infer_league_and_season(game_id)
@@ -375,6 +414,134 @@ def resolve_league_for_game(game_id, league_lookup, team_to_league):
         pass
 
     return "unknown"
+
+
+# ============================================================================
+# ACTUAL-RESULTS LOOKUP
+# ============================================================================
+
+def load_actual_results_from_history(
+    path: Path = HISTORICAL_MATCH_PATH,
+) -> dict[str, tuple[int, int]]:
+    """
+    Read big5_matches_fixed.csv and return {game_id: (home_goals, away_goals)}
+    for every match that has a valid score recorded.
+
+    Rows with missing / non-numeric goals are skipped.
+    """
+    if not path.exists():
+        print(f"⚠ {path} not found — cannot populate actual goals.")
+        return {}
+
+    hist = pd.read_csv(path, low_memory=False)
+
+    if "game_id" not in hist.columns:
+        print(f"⚠ {path} has no 'game_id' column.")
+        return {}
+
+    if "Home_goals" not in hist.columns or "Away_goals" not in hist.columns:
+        print(f"⚠ {path} is missing 'Home_goals' / 'Away_goals' columns.")
+        return {}
+
+    lookup: dict[str, tuple[int, int]] = {}
+    for _, row in hist.iterrows():
+        gid = row.get("game_id")
+        if not isinstance(gid, str) or not gid.strip():
+            continue
+        hg = pd.to_numeric(row.get("Home_goals"), errors="coerce")
+        ag = pd.to_numeric(row.get("Away_goals"), errors="coerce")
+        if pd.isna(hg) or pd.isna(ag):
+            continue
+        lookup[gid.strip()] = (int(hg), int(ag))
+
+    print(f"  Loaded {len(lookup)} historical results from {path.name}")
+    return lookup
+
+
+def update_actuals_from_results(dated_path: Path,
+                                results: dict[str, tuple[int, int]],
+                                overwrite: bool = False) -> int:
+    """
+    Fill in actual_home_goals / actual_away_goals / actual_outcome in a
+    dated weekly_predictions CSV.
+
+    Parameters
+    ----------
+    dated_path : Path
+        Path to a weekly_predictions_YYYY-MM-DD.csv file.
+    results : dict
+        Mapping game_id -> (home_goals, away_goals).
+    overwrite : bool
+        If False (default), rows that already have actual_home_goals set
+        are left untouched (safe for hand-corrected data). If True,
+        existing values are replaced.
+
+    Returns
+    -------
+    int
+        Number of rows updated.
+    """
+    if not dated_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(dated_path)
+    except Exception as e:
+        print(f"⚠ Could not read {dated_path.name}: {e}")
+        return 0
+
+    if df.empty or "game_id" not in df.columns:
+        return 0
+
+    # --- Ensure the three placeholder columns exist with the right dtypes ---
+    # actual_home_goals / actual_away_goals: nullable Int64 (holds NA + ints).
+    # actual_outcome: nullable string ("HOME_WIN" / "DRAW" / "AWAY_WIN").
+    if "actual_home_goals" not in df.columns:
+        df["actual_home_goals"] = pd.Series([pd.NA] * len(df), dtype="Int64")
+    else:
+        df["actual_home_goals"] = pd.to_numeric(
+            df["actual_home_goals"], errors="coerce"
+        ).astype("Int64")
+
+    if "actual_away_goals" not in df.columns:
+        df["actual_away_goals"] = pd.Series([pd.NA] * len(df), dtype="Int64")
+    else:
+        df["actual_away_goals"] = pd.to_numeric(
+            df["actual_away_goals"], errors="coerce"
+        ).astype("Int64")
+
+    if "actual_outcome" not in df.columns:
+        df["actual_outcome"] = pd.Series([pd.NA] * len(df), dtype="string")
+    else:
+        df["actual_outcome"] = df["actual_outcome"].astype("string")
+
+    # Pre-mark existing values so we don't re-process them when overwrite=False
+    already_filled = df["actual_home_goals"].notna()
+
+    updated = 0
+    for gid, (hg, ag) in results.items():
+        mask = df["game_id"].astype(str) == str(gid)
+        if not mask.any():
+            continue
+        if not overwrite:
+            mask = mask & ~already_filled
+        if not mask.any():
+            continue
+
+        df.loc[mask, "actual_home_goals"] = int(hg)
+        df.loc[mask, "actual_away_goals"] = int(ag)
+        if hg > ag:
+            outcome = "HOME_WIN"
+        elif hg == ag:
+            outcome = "DRAW"
+        else:
+            outcome = "AWAY_WIN"
+        df.loc[mask, "actual_outcome"] = outcome
+        updated += int(mask.sum())
+
+    if updated > 0:
+        df.to_csv(dated_path, index=False, na_rep="")
+    return updated
 
 
 # ============================================================================
@@ -606,23 +773,15 @@ def sweep_blend_weights(clf_probs, rate_probs, y_true, weights, objective="balan
 
 
 # ============================================================================
-# TRAINING
+# TRAINING (in-memory only — no file writes)
 # ============================================================================
 
-def train_lstm(config: LSTMConfig, device):
+def train_model(config: LSTMConfig, device) -> TrainedModel:
+    """Train an LSTM on the prepared splits and return the trained artefacts."""
     print("=" * 78)
     print("TRAINING LSTM ON DASHBOARD DATA")
     print("=" * 78)
 
-    # ------------------------------------------------------------------
-    # Ensure weekly_results/ exists (do NOT wipe — it's append-only history)
-    # ------------------------------------------------------------------
-    WEEKLY_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Using weekly_results/ as append-only history: {WEEKLY_RESULTS_DIR}")
-
-    # ------------------------------------------------------------------
-    # Load merged frames
-    # ------------------------------------------------------------------
     train_full = load_merged_split("TRAIN", config.modules)
     test_df = load_merged_split("TEST", config.modules)
     train_df, val_df = split_train_val(train_full, config.val_fraction)
@@ -661,9 +820,6 @@ def train_lstm(config: LSTMConfig, device):
               f"DRAW {counts[1]:>5} ({pcts[1]:>4.1f}%)  "
               f"AWAY {counts[2]:>5} ({pcts[2]:>4.1f}%)")
 
-    # ------------------------------------------------------------------
-    # Datasets
-    # ------------------------------------------------------------------
     train_ds = MatchDataset(train_df, home_cols, away_cols, other_cols)
     val_ds = MatchDataset(val_df, home_cols, away_cols, other_cols)
     test_ds = MatchDataset(test_df, home_cols, away_cols, other_cols)
@@ -672,9 +828,6 @@ def train_lstm(config: LSTMConfig, device):
     val_loader = DataLoader(val_ds, batch_size=config.batch_size, shuffle=False, collate_fn=collate)
     test_loader = DataLoader(test_ds, batch_size=config.batch_size, shuffle=False, collate_fn=collate)
 
-    # ------------------------------------------------------------------
-    # Model
-    # ------------------------------------------------------------------
     model = LSTMMatchModel(
         home_dim=len(home_cols), away_dim=len(away_cols),
         other_dim=len(other_cols), config=config,
@@ -692,9 +845,6 @@ def train_lstm(config: LSTMConfig, device):
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"\nModel parameters: {n_params:,}")
 
-    # ------------------------------------------------------------------
-    # Training loop
-    # ------------------------------------------------------------------
     best_val_bal = -1.0
     best_state = None
     best_epoch = 0
@@ -744,9 +894,7 @@ def train_lstm(config: LSTMConfig, device):
         model.load_state_dict(best_state)
         print(f"  ✓ Restored best model from epoch {best_epoch}")
 
-    # ------------------------------------------------------------------
-    # Test predictions
-    # ------------------------------------------------------------------
+    # ---- Test predictions ----
     model.eval()
     test_probs_list, test_keys = [], []
     test_home_pred, test_away_pred = [], []
@@ -769,7 +917,7 @@ def train_lstm(config: LSTMConfig, device):
     target_priors = train_priors
     test_probs_corrected = prior_correct_probs(test_probs_raw, train_priors, target_priors)
 
-    # Draw margin tuning on validation
+    # ---- Draw margin tuning on validation ----
     val_home_pred, val_away_pred = [], []
     with torch.no_grad():
         for batch in val_loader:
@@ -792,7 +940,7 @@ def train_lstm(config: LSTMConfig, device):
     test_clf_pred = np.argmax(test_probs_raw, axis=1)
     test_clf_corrected_pred = np.argmax(test_probs_corrected, axis=1)
 
-    # Blend weight selected on validation
+    # ---- Blend weight tuning on validation ----
     val_probs_list = []
     with torch.no_grad():
         for batch in val_loader:
@@ -815,156 +963,64 @@ def train_lstm(config: LSTMConfig, device):
     test_blend_probs = best_weight * test_probs_corrected + (1 - best_weight) * test_rate_probs
     test_blend_pred = np.argmax(test_blend_probs, axis=1)
 
-    # ------------------------------------------------------------------
-    # Save raw predictions (always "latest")
-    # ------------------------------------------------------------------
-    pred_frame = pd.DataFrame({
-        "game_id": test_keys,
-        "HG": test_df["HG"].values,
-        "AG": test_df["AG"].values,
-        "lambda_home": test_home_pred,
-        "lambda_away": test_away_pred,
-        "expected_goal_diff": test_home_pred - test_away_pred,
-        "prob_home": test_blend_probs[:, 0],
-        "prob_draw": test_blend_probs[:, 1],
-        "prob_away": test_blend_probs[:, 2],
-        "predicted_result": test_blend_pred,
-    })
-    pred_frame.to_csv(PRED_PATH, index=False)
+    return TrainedModel(
+        model=model,
+        config=config,
+        home_cols=home_cols,
+        away_cols=away_cols,
+        other_cols=other_cols,
+        home_prior=home_prior,
+        away_prior=away_prior,
+        draw_margin=draw_margin,
+        blend_weight=best_weight,
+        train_priors=train_priors,
+        best_epoch=best_epoch,
+        n_params=n_params,
+        val_balanced_accuracy=val_bal,
+        test_keys=test_keys,
+        test_home_pred=test_home_pred,
+        test_away_pred=test_away_pred,
+        test_blend_probs=test_blend_probs,
+        test_blend_pred=test_blend_pred,
+        test_df=test_df,
+        val_outcomes=val_outcomes,
+        sweep_results=sweep_results,
+    )
 
-    # ------------------------------------------------------------------
-    # Build the weekly summary table (with league resolution)
-    # ------------------------------------------------------------------
-    team_lookup, league_lookup = load_upcoming_context()
-    team_to_league = build_team_to_league_from_history()
 
-    print(f"\nLeague resolution sources:")
-    print(f"  Scraper Competition tags:   {len(league_lookup)} game_ids")
-    print(f"  Team→league from history:   {len(team_to_league)} team codes")
+# ============================================================================
+# ENTRY POINT
+# ============================================================================
 
-    weekly_rows = []
-    unresolved_leagues = 0
-
-    for _, row in pred_frame.iterrows():
-        gid = row["game_id"]
-        home_code, away_code = extract_team_codes_from_game_id(gid)
-        home_name = team_lookup.get(home_code, home_code) if home_code else home_code
-        away_name = team_lookup.get(away_code, away_code) if away_code else away_code
-
-        league_raw = resolve_league_for_game(gid, league_lookup, team_to_league)
-        league_display = LEAGUE_DISPLAY.get(league_raw, league_raw)
-        if league_raw == "unknown":
-            unresolved_leagues += 1
-
-        prob_h = float(row["prob_home"])
-        prob_d = float(row["prob_draw"])
-        prob_a = float(row["prob_away"])
-        outcome_code = int(row["predicted_result"])
-        confidence = max(prob_h, prob_d, prob_a)
-
-        weekly_rows.append({
-            "game_id": gid,
-            "league": league_display,
-            "home_team": home_name,
-            "away_team": away_name,
-            "predicted_home_goals": round(float(row["lambda_home"]), 2),
-            "predicted_away_goals": round(float(row["lambda_away"]), 2),
-            "predicted_goal_diff": round(float(row["expected_goal_diff"]), 2),
-            "prob_home_win": round(prob_h, 3),
-            "prob_draw": round(prob_d, 3),
-            "prob_away_win": round(prob_a, 3),
-            "predicted_outcome": OUTCOME_LABEL[outcome_code],
-            "confidence": round(confidence, 3),
-        })
-
-    weekly_df = pd.DataFrame(weekly_rows)
-
-    # ------------------------------------------------------------------
-    # Save weekly predictions: dated file + latest copy
-    # ------------------------------------------------------------------
-    dated_path, latest_path = dated_output_paths(WEEKLY_RESULTS_DIR)
-    weekly_df.to_csv(dated_path, index=False)
-    weekly_df.to_csv(latest_path, index=False)
-
-    print(f"\n  Saved dated weekly predictions: {dated_path.name}")
-    print(f"  Refreshed latest copy:          {latest_path.name}")
-
-    if unresolved_leagues > 0:
-        print(f"\n⚠ {unresolved_leagues} fixtures could not be assigned a league.")
-
-    # ------------------------------------------------------------------
-    # Save model + summary
-    # ------------------------------------------------------------------
+def save_model(trained: TrainedModel, path: Path = MODEL_PATH):
     torch.save({
-        "state_dict": model.state_dict(),
-        "config": config.__dict__,
-        "home_cols": home_cols,
-        "away_cols": away_cols,
-        "other_cols": other_cols,
-        "home_prior": home_prior,
-        "away_prior": away_prior,
-        "draw_margin": draw_margin,
-        "blend_weight": best_weight,
-        "train_priors": train_priors.tolist(),
-    }, MODEL_PATH)
+        "state_dict": trained.model.state_dict(),
+        "config": trained.config.__dict__,
+        "home_cols": trained.home_cols,
+        "away_cols": trained.away_cols,
+        "other_cols": trained.other_cols,
+        "home_prior": trained.home_prior,
+        "away_prior": trained.away_prior,
+        "draw_margin": trained.draw_margin,
+        "blend_weight": trained.blend_weight,
+        "train_priors": trained.train_priors.tolist(),
+    }, path)
 
-    summary = {
-        "run_date": datetime.now().isoformat(timespec="seconds"),
-        "config": config.__dict__,
-        "params": {"total_trainable": n_params},
-        "feature_layout": {
-            "home_cols": len(home_cols),
-            "away_cols": len(away_cols),
-            "other_cols": len(other_cols),
-        },
-        "rows": {
-            "train": len(train_df),
-            "val": len(val_df),
-            "upcoming": len(test_df),
-        },
-        "league_resolution": {
-            "from_scraper": len(league_lookup),
-            "from_history": len(team_to_league),
-            "unresolved": unresolved_leagues,
-        },
-        "priors": {"train": train_priors.tolist()},
-        "validation": {"draw_margin": draw_margin, "balanced_accuracy": val_bal},
-        "blend_weight_selected": best_weight,
-        "blend_sweep_top5": sweep_results[:5],
-        "best_epoch": best_epoch,
-        "output_files": {
-            "dated_weekly": str(dated_path),
-            "latest_weekly": str(latest_path),
-            "raw_predictions": str(PRED_PATH),
-            "model": str(MODEL_PATH),
-        },
-    }
-    SUMMARY_PATH.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
-    # ------------------------------------------------------------------
-    # Report
-    # ------------------------------------------------------------------
-    print("\n" + "=" * 78)
-    print("WEEKLY PREDICTIONS")
-    print("=" * 78)
-    print(weekly_df.to_string(index=False))
-
-    print(f"\n  Saved {len(weekly_df)} upcoming fixtures.")
-    print(f"  Predicted outcome distribution: "
-          f"HOME={(weekly_df['predicted_outcome'] == 'HOME_WIN').sum()}  "
-          f"DRAW={(weekly_df['predicted_outcome'] == 'DRAW').sum()}  "
-          f"AWAY={(weekly_df['predicted_outcome'] == 'AWAY_WIN').sum()}")
-    print(f"  League distribution:")
-    for lg, count in weekly_df["league"].value_counts().items():
-        print(f"    {lg}: {count}")
-
-    print(f"\n  Saved raw predictions to:       {PRED_PATH}")
-    print(f"  Saved dated weekly table to:    {dated_path}")
-    print(f"  Saved latest weekly table to:   {latest_path}")
-    print(f"  Saved model to:                 {MODEL_PATH}")
-    print(f"  Saved summary to:               {SUMMARY_PATH}")
-
-    return summary
+def save_raw_predictions(trained: TrainedModel, path: Path = PRED_PATH):
+    pred_frame = pd.DataFrame({
+        "game_id": trained.test_keys,
+        "HG": trained.test_df["HG"].values,
+        "AG": trained.test_df["AG"].values,
+        "lambda_home": trained.test_home_pred,
+        "lambda_away": trained.test_away_pred,
+        "expected_goal_diff": trained.test_home_pred - trained.test_away_pred,
+        "prob_home": trained.test_blend_probs[:, 0],
+        "prob_draw": trained.test_blend_probs[:, 1],
+        "prob_away": trained.test_blend_probs[:, 2],
+        "predicted_result": trained.test_blend_pred,
+    })
+    pred_frame.to_csv(path, index=False)
 
 
 def main():
@@ -973,7 +1029,16 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
-    train_lstm(config, device)
+    WEEKLY_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    trained = train_model(config, device)
+
+    save_model(trained)
+    save_raw_predictions(trained)
+
+    print(f"\n  Saved model to:            {MODEL_PATH}")
+    print(f"  Saved raw predictions to:  {PRED_PATH}")
+    print("\nNext step: run l_prepare_shiny_data.py to build the dashboard CSVs.")
 
 
 if __name__ == "__main__":
