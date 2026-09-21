@@ -4,20 +4,24 @@
 """Create train/test lineup embeddings with an IMPROVED 2-Block Transformer Encoder.
 
 Key improvements:
-- Two transformer blocks with residual connections
-- Layer normalization for stable training
-- GELU activation (better than ReLU for transformers)
-- Final attention pooling
+- Two Pre-LayerNorm transformer blocks (more stable than Post-LN)
+- Per-slot learnable positional embeddings (distinguishes 1st vs 3rd defender)
+- Structural position bias in self-attention (same-position players interact more)
+- Attention pooling with a learnable query that also considers player position
+- Deeper final MLP head with GELU
 - Early stopping and LR scheduling
 
 This is a representation learning model - complexity is justified here
 (unlike the prediction MLP where simplicity worked better).
+
+NOTE: Match results (goals) are read directly from data/big5_matches_fixed.csv.
+      The legacy data/target_variables.csv file is no longer required.
 """
 
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -31,7 +35,7 @@ from torch.utils.data import DataLoader, Dataset
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
 INPUT_PATH = PROJECT_DIR / "data" / "lineups.csv"
-TARGET_PATH = PROJECT_DIR / "data" / "target_variables.csv"
+GOALS_SOURCE_PATH = PROJECT_DIR / "data" / "big5_matches_fixed.csv"
 FINAL_DATA_DIR = PROJECT_DIR / "final_data"
 MISC_DIR = PROJECT_DIR / "misc"
 
@@ -48,6 +52,8 @@ POSITION_TO_INDEX = {"GK": 0, "DEF": 1, "MID": 2, "ATT": 3}
 class LineupEncoderConfig:
     player_embedding_dim: int = 32
     position_embedding_dim: int = 8
+    # NEW: per-slot embeddings, up to 11 slots per side
+    slot_embedding_dim: int = 4
     hidden_dim: int = 64
     output_dim: int = 32
     max_players_per_team: int = 11
@@ -63,6 +69,9 @@ class LineupEncoderConfig:
     lr_patience: int = 5
     lr_factor: float = 0.5
     min_lr: float = 1e-5
+    # NEW: structural bias in self-attention — same-position pairs get
+    # a small positive bias, promoting intra-role interactions.
+    same_position_bias: float = 0.5
 
 
 # ============================================================================
@@ -154,72 +163,126 @@ def build_player_vocab(frame):
     return vocab
 
 
+def load_match_results(goals_path: Path) -> pd.DataFrame:
+    """
+    Load match results from the historical matches file and normalize the
+    goal columns to HG / AG.
+
+    Accepts any of these column-name pairs for home/away goals:
+      HG / AG, FTHG / FTAG, Home_goals / Away_goals, home_goals / away_goals
+    """
+    if not goals_path.exists():
+        raise FileNotFoundError(f"Goals source file not found: {goals_path}")
+
+    raw = pd.read_csv(goals_path, low_memory=False)
+
+    home_candidates = ["HG", "FTHG", "Home_goals", "home_goals"]
+    away_candidates = ["AG", "FTAG", "Away_goals", "away_goals"]
+
+    hg_col = next((c for c in home_candidates if c in raw.columns), None)
+    ag_col = next((c for c in away_candidates if c in raw.columns), None)
+
+    if "game_id" not in raw.columns or hg_col is None or ag_col is None:
+        raise KeyError(
+            f"Could not locate game_id + goal columns in {goals_path}. "
+            f"Available columns: {list(raw.columns)}"
+        )
+
+    out = (
+        raw[["game_id", hg_col, ag_col]]
+        .rename(columns={hg_col: "HG", ag_col: "AG"})
+        .drop_duplicates(subset=["game_id"], keep="first")
+    )
+    out["HG"] = pd.to_numeric(out["HG"], errors="coerce")
+    out["AG"] = pd.to_numeric(out["AG"], errors="coerce")
+    out = out.dropna(subset=["HG", "AG"])
+    return out
+
+
 # ============================================================================
 # ATTENTION MODULES
 # ============================================================================
 
 class MultiHeadAttention(nn.Module):
-    """Multi-head self-attention with position bias."""
-    
-    def __init__(self, hidden_dim, attention_heads=4, dropout=0.1):
+    """
+    Multi-head self-attention with:
+      - Learnable positional bias (by position category)
+      - Optional same-position structural bias
+      - Padding mask
+    """
+
+    def __init__(self, hidden_dim, attention_heads=4, dropout=0.1,
+                 same_position_bias=0.5):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.attention_heads = attention_heads
         self.head_dim = hidden_dim // attention_heads
         self.attention_scale = self.head_dim ** 0.5
-        
+        self.same_position_bias = same_position_bias
+
         self.query = nn.Linear(hidden_dim, hidden_dim)
         self.key = nn.Linear(hidden_dim, hidden_dim)
         self.value = nn.Linear(hidden_dim, hidden_dim)
         self.out_proj = nn.Linear(hidden_dim, hidden_dim)
-        
+
+        # Learnable per-position bias (4 categories)
         self.position_bias = nn.Parameter(torch.zeros(4))
         self.attention_dropout = nn.Dropout(dropout)
-        
+
     def forward(self, x, position_indices, mask):
         batch_size, num_players, _ = x.shape
-        
+
         Q = self.query(x)
         K = self.key(x)
         V = self.value(x)
-        
-        # Multi-head reshape
+
         Q = Q.view(batch_size, num_players, self.attention_heads, self.head_dim).transpose(1, 2)
         K = K.view(batch_size, num_players, self.attention_heads, self.head_dim).transpose(1, 2)
         V = V.view(batch_size, num_players, self.attention_heads, self.head_dim).transpose(1, 2)
-        
-        # Attention scores
+
         attn_scores = torch.matmul(Q, K.transpose(-2, -1)) / self.attention_scale
-        
-        # Position bias
-        pos_bias = self.position_bias[position_indices]
-        pos_bias = pos_bias.unsqueeze(1).unsqueeze(2)
-        attn_scores = attn_scores + pos_bias
-        
+
+        # Position bias — broadcast over heads and query positions
+        pos_bias = self.position_bias[position_indices]         # (B, T)
+        attn_scores = attn_scores + pos_bias.unsqueeze(1).unsqueeze(2)
+
+        # Same-position structural bias — same-category players interact more
+        if self.same_position_bias != 0.0:
+            pos_eq = position_indices.unsqueeze(2) == position_indices.unsqueeze(1)  # (B, T, T)
+            same_bias = pos_eq.float() * self.same_position_bias
+            attn_scores = attn_scores + same_bias.unsqueeze(1)
+
         # Mask padding
         mask_expanded = mask.unsqueeze(1).unsqueeze(2)
         attn_scores = attn_scores.masked_fill(mask_expanded == 0, -1e9)
-        
-        # Softmax
+
         attn_weights = F.softmax(attn_scores, dim=-1)
         attn_weights = self.attention_dropout(attn_weights)
-        
-        # Apply attention
+
         attended = torch.matmul(attn_weights, V)
-        attended = attended.transpose(1, 2).contiguous().view(batch_size, num_players, self.hidden_dim)
-        
+        attended = attended.transpose(1, 2).contiguous().view(
+            batch_size, num_players, self.hidden_dim
+        )
+
         return self.out_proj(attended)
 
 
 class TransformerBlock(nn.Module):
-    """Transformer block: self-attention + feed-forward with residuals."""
-    
-    def __init__(self, hidden_dim, attention_heads, dropout):
+    """
+    Pre-LayerNorm transformer block:
+        x = x + attn(norm(x))
+        x = x + ffn(norm(x))
+    Pre-LN is more stable than Post-LN in small models.
+    """
+
+    def __init__(self, hidden_dim, attention_heads, dropout, same_position_bias=0.5):
         super().__init__()
-        self.attention = MultiHeadAttention(hidden_dim, attention_heads, dropout)
+        self.attention = MultiHeadAttention(
+            hidden_dim, attention_heads, dropout, same_position_bias
+        )
         self.norm1 = nn.LayerNorm(hidden_dim)
         self.norm2 = nn.LayerNorm(hidden_dim)
-        
+
         self.ffn = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim * 2),
             nn.GELU(),
@@ -227,35 +290,41 @@ class TransformerBlock(nn.Module):
             nn.Linear(hidden_dim * 2, hidden_dim),
             nn.Dropout(dropout),
         )
-    
+
     def forward(self, x, position_indices, mask):
-        attn_out = self.attention(x, position_indices, mask)
-        x = self.norm1(x + attn_out)
-        ffn_out = self.ffn(x)
-        x = self.norm2(x + ffn_out)
+        x = x + self.attention(self.norm1(x), position_indices, mask)
+        x = x + self.ffn(self.norm2(x))
         return x
 
 
 class AttentionPooling(nn.Module):
-    """Final attention pooling to get team representation."""
-    
-    def __init__(self, hidden_dim, attention_heads=4, dropout=0.1):
+    """
+    Attention pooling with a learnable query that also attends by position.
+    """
+
+    def __init__(self, hidden_dim, attention_heads=4, dropout=0.1,
+                 same_position_bias=0.0):
         super().__init__()
-        self.attention = MultiHeadAttention(hidden_dim, attention_heads, dropout)
+        # same_position_bias=0.0: pooling query is not a player, so no
+        # same-position bias applies.
+        self.attention = MultiHeadAttention(
+            hidden_dim, attention_heads, dropout, same_position_bias
+        )
         self.pool_query = nn.Parameter(torch.randn(1, 1, hidden_dim) * 0.02)
-    
+
     def forward(self, x, position_indices, mask):
         batch_size, num_players, _ = x.shape
-        
+
         pool_query = self.pool_query.expand(batch_size, -1, -1)
         x_with_query = torch.cat([pool_query, x], dim=1)
-        
+
         query_mask = torch.ones(batch_size, 1, device=mask.device)
         extended_mask = torch.cat([query_mask, mask], dim=1)
-        
-        query_pos = torch.zeros(batch_size, 1, dtype=position_indices.dtype, device=position_indices.device)
+
+        query_pos = torch.zeros(batch_size, 1, dtype=position_indices.dtype,
+                                device=position_indices.device)
         extended_pos = torch.cat([query_pos, position_indices], dim=1)
-        
+
         attended = self.attention(x_with_query, extended_pos, extended_mask)
         pooled = attended[:, 0, :]
         return pooled
@@ -266,28 +335,51 @@ class AttentionPooling(nn.Module):
 # ============================================================================
 
 class ImprovedLineupEncoder(nn.Module):
-    """2-block transformer encoder with residual connections."""
-    
+    """Pre-LN 2-block transformer encoder with residual connections."""
+
     def __init__(self, player_vocab, config):
         super().__init__()
         self.config = config
         self.player_vocab = player_vocab
 
-        self.player_embedding = nn.Embedding(len(self.player_vocab), config.player_embedding_dim)
-        self.position_embedding = nn.Embedding(len(POSITION_TO_INDEX), config.position_embedding_dim)
+        self.player_embedding = nn.Embedding(
+            len(self.player_vocab), config.player_embedding_dim
+        )
+        self.position_embedding = nn.Embedding(
+            len(POSITION_TO_INDEX), config.position_embedding_dim
+        )
+        # NEW: per-slot embedding, indexed by lineup slot (0..max_players-1)
+        self.slot_embedding = nn.Embedding(
+            config.max_players_per_team, config.slot_embedding_dim
+        )
 
-        input_dim = config.player_embedding_dim + config.position_embedding_dim
+        input_dim = (
+            config.player_embedding_dim
+            + config.position_embedding_dim
+            + config.slot_embedding_dim
+        )
         self.input_proj = nn.Linear(input_dim, config.hidden_dim)
         self.input_dropout = nn.Dropout(config.dropout)
-        
+
         self.blocks = nn.ModuleList([
-            TransformerBlock(config.hidden_dim, config.attention_heads, config.dropout)
+            TransformerBlock(
+                config.hidden_dim,
+                config.attention_heads,
+                config.dropout,
+                same_position_bias=config.same_position_bias,
+            )
             for _ in range(config.num_transformer_blocks)
         ])
-        
-        self.pooling = AttentionPooling(config.hidden_dim, config.attention_heads, config.dropout)
-        
+
+        self.pooling = AttentionPooling(
+            config.hidden_dim, config.attention_heads, config.dropout
+        )
+
+        # Deeper final head — GELU, extra layer, residual-friendly
         self.rho = nn.Sequential(
+            nn.Linear(config.hidden_dim, config.hidden_dim),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
             nn.Linear(config.hidden_dim, config.hidden_dim // 2),
             nn.GELU(),
             nn.Dropout(config.dropout),
@@ -297,12 +389,19 @@ class ImprovedLineupEncoder(nn.Module):
     def forward(self, player_indices, position_indices, mask):
         player_emb = self.player_embedding(player_indices)
         position_emb = self.position_embedding(position_indices)
-        x = torch.cat([player_emb, position_emb], dim=-1)
+
+        # Slot indices: [0, 1, ..., T-1] broadcast over batch
+        batch_size, num_players = player_indices.shape
+        slot_indices = torch.arange(num_players, device=player_indices.device)
+        slot_indices = slot_indices.unsqueeze(0).expand(batch_size, -1)
+        slot_emb = self.slot_embedding(slot_indices)
+
+        x = torch.cat([player_emb, position_emb, slot_emb], dim=-1)
         x = self.input_dropout(self.input_proj(x))
-        
+
         for block in self.blocks:
             x = block(x, position_indices, mask)
-        
+
         pooled = self.pooling(x, position_indices, mask)
         return self.rho(pooled)
 
@@ -320,8 +419,12 @@ class LineupGoalPredictor(nn.Module):
         )
 
     def forward(self, batch):
-        home_emb = self.encoder(batch["home_player_idx"], batch["home_pos_idx"], batch["home_mask"])
-        away_emb = self.encoder(batch["away_player_idx"], batch["away_pos_idx"], batch["away_mask"])
+        home_emb = self.encoder(
+            batch["home_player_idx"], batch["home_pos_idx"], batch["home_mask"]
+        )
+        away_emb = self.encoder(
+            batch["away_player_idx"], batch["away_pos_idx"], batch["away_mask"]
+        )
         x = torch.cat([home_emb, away_emb], dim=1)
         rates = F.softplus(self.head(x)) + 1e-6
         return rates[:, 0], rates[:, 1]
@@ -346,7 +449,9 @@ class LineupSupervisedDataset(Dataset):
         unk_idx = self.player_vocab["<UNK>"]
         for _, row in self.frame.iterrows():
             player_ids, positions = extract_lineup_players(row, side)
-            player_ids, positions, mask = normalize_lineup(player_ids, positions, self.config.max_players_per_team)
+            player_ids, positions, mask = normalize_lineup(
+                player_ids, positions, self.config.max_players_per_team
+            )
             player_idx_rows.append([self.player_vocab.get(pid, unk_idx) for pid in player_ids])
             position_idx_rows.append([POSITION_TO_INDEX[pos] for pos in positions])
             mask_rows.append(mask)
@@ -387,8 +492,11 @@ def collate_lineup_batch(batch):
 
 def encode_dataframe(encoder, frame, config):
     encoder.eval()
-    dataset = LineupSupervisedDataset(frame.assign(HG=0.0, AG=0.0), encoder.player_vocab, config)
-    loader = DataLoader(dataset, batch_size=1024, shuffle=False, collate_fn=collate_lineup_batch)
+    dataset = LineupSupervisedDataset(
+        frame.assign(HG=0.0, AG=0.0), encoder.player_vocab, config
+    )
+    loader = DataLoader(dataset, batch_size=1024, shuffle=False,
+                        collate_fn=collate_lineup_batch)
 
     home_chunks, away_chunks = [], []
     with torch.no_grad():
@@ -419,14 +527,20 @@ def train_encoder(train_frame, test_frame, player_vocab, config):
 
     train_ds = LineupSupervisedDataset(train_frame, player_vocab, config)
     test_ds = LineupSupervisedDataset(test_frame, player_vocab, config)
-    train_loader = DataLoader(train_ds, batch_size=config.batch_size, shuffle=True, collate_fn=collate_lineup_batch)
-    test_loader = DataLoader(test_ds, batch_size=config.batch_size, shuffle=False, collate_fn=collate_lineup_batch)
+    train_loader = DataLoader(train_ds, batch_size=config.batch_size,
+                              shuffle=True, collate_fn=collate_lineup_batch)
+    test_loader = DataLoader(test_ds, batch_size=config.batch_size,
+                             shuffle=False, collate_fn=collate_lineup_batch)
 
     encoder = ImprovedLineupEncoder(player_vocab, config=config).to(device)
     model = LineupGoalPredictor(encoder=encoder, hidden_dim=config.hidden_dim).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=config.lr_factor,
-                                                           patience=config.lr_patience, min_lr=config.min_lr)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
+    )
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=config.lr_factor,
+        patience=config.lr_patience, min_lr=config.min_lr
+    )
 
     best_test_loss = float("inf")
     best_epoch = 0
@@ -436,9 +550,11 @@ def train_encoder(train_frame, test_frame, player_vocab, config):
     print("=" * 70)
     print("TRAINING IMPROVED TRANSFORMER LINEUP ENCODER")
     print("=" * 70)
-    print(f"Blocks: {config.num_transformer_blocks} | Heads: {config.attention_heads} | "
-          f"Hidden: {config.hidden_dim} | Emb: {config.player_embedding_dim} | "
-          f"Output: {config.output_dim} | LR: {config.learning_rate}")
+    print(f"Blocks: {config.num_transformer_blocks} (Pre-LN) | "
+          f"Heads: {config.attention_heads} | Hidden: {config.hidden_dim} | "
+          f"Emb: player={config.player_embedding_dim}, pos={config.position_embedding_dim}, "
+          f"slot={config.slot_embedding_dim} | Output: {config.output_dim} | "
+          f"LR: {config.learning_rate}")
 
     for epoch in range(1, config.epochs + 1):
         model.train()
@@ -473,7 +589,8 @@ def train_encoder(train_frame, test_frame, player_vocab, config):
             best_test_loss = test_loss
             best_epoch = epoch
             epochs_no_improve = 0
-            best_encoder_state = {k: v.detach().cpu().clone() for k, v in encoder.state_dict().items()}
+            best_encoder_state = {k: v.detach().cpu().clone()
+                                  for k, v in encoder.state_dict().items()}
         else:
             epochs_no_improve += 1
 
@@ -483,7 +600,8 @@ def train_encoder(train_frame, test_frame, player_vocab, config):
                   f"Test NLL {test_loss:.5f} | LR {lr_now:.1e}")
 
         if epochs_no_improve >= config.early_stopping_patience:
-            print(f"  ⏹ Early stop at epoch {epoch} (best ep {best_epoch}, NLL {best_test_loss:.5f})")
+            print(f"  ⏹ Early stop at epoch {epoch} (best ep {best_epoch}, "
+                  f"NLL {best_test_loss:.5f})")
             break
 
     if best_encoder_state is not None:
@@ -494,32 +612,38 @@ def train_encoder(train_frame, test_frame, player_vocab, config):
         "best_test_goal_nll": best_test_loss,
         "best_epoch": best_epoch,
         "epochs_trained": epoch,
-        "architecture": "2_block_transformer_encoder",
+        "architecture": "2_block_pre_ln_transformer_encoder_with_slot_emb",
         "num_transformer_blocks": config.num_transformer_blocks,
         "attention_heads": config.attention_heads,
         "hidden_dim": config.hidden_dim,
         "player_embedding_dim": config.player_embedding_dim,
+        "position_embedding_dim": config.position_embedding_dim,
+        "slot_embedding_dim": config.slot_embedding_dim,
         "output_dim": config.output_dim,
+        "same_position_bias": config.same_position_bias,
         "trained": True,
     }
     return encoder, metrics
 
 
+# ============================================================================
+# MAIN
+# ============================================================================
+
 def main():
     if not INPUT_PATH.exists():
         raise FileNotFoundError(f"Input file not found: {INPUT_PATH}")
-    if not TARGET_PATH.exists():
-        raise FileNotFoundError(f"Target file not found: {TARGET_PATH}")
 
     frame = pd.read_csv(INPUT_PATH, low_memory=False)
-    targets = pd.read_csv(TARGET_PATH, low_memory=False)
 
     if "game_id" not in frame.columns or "Date" not in frame.columns:
         raise KeyError("lineups.csv must contain game_id and Date columns.")
-    if not {"game_id", "HG", "AG"}.issubset(targets.columns):
-        raise KeyError("target_variables.csv must contain game_id, HG, AG.")
 
-    frame = frame.merge(targets[["game_id", "HG", "AG"]], on="game_id", how="left")
+    # --- Load goals directly from the historical matches file ------------
+    targets = load_match_results(GOALS_SOURCE_PATH)
+    print(f"Loaded {len(targets)} match results from {GOALS_SOURCE_PATH.name}")
+
+    frame = frame.merge(targets, on="game_id", how="left")
     before = len(frame)
     frame = frame.dropna(subset=["HG", "AG"]).copy()
     print(f"Dropped {before - len(frame)} rows without HG/AG labels.")
@@ -542,7 +666,10 @@ def main():
     train_output.to_csv(TRAIN_OUTPUT_PATH, index=False)
     test_output.to_csv(TEST_OUTPUT_PATH, index=False)
 
-    vocab_df = pd.DataFrame({"player_id": list(player_vocab.keys()), "index": list(player_vocab.values())})
+    vocab_df = pd.DataFrame({
+        "player_id": list(player_vocab.keys()),
+        "index": list(player_vocab.values()),
+    })
     vocab_df.to_csv(VOCAB_PATH, index=False)
 
     torch.save(encoder.state_dict(), STATE_DICT_PATH)

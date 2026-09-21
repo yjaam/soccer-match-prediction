@@ -1,48 +1,67 @@
 team_name,team_code,type
 1. Fußballclub Heidenheim 1846,HDH,home
+1.FC Köln,KOE,home
+1.FC Nuremberg,FCN,home
+1.FC Union Berlin,UNB,home
+1.FSV Mainz 05,M05,home
 AC Ajaccio,ACA,home
 AC Carpi,CAR,home
 AC Milan,ACM,home
 AC Monza,MON,home
+ACF Fiorentina,FIO,home
 AFC Bournemouth,BOU,home
 AJ Auxerre,AJA,home
 AS Monaco,ASM,home
 AS Nancy-Lorraine,NAN,home
 AS Saint-Étienne,STE,home
 Amiens SC,AMI,home
+Angers SCO,ANG,home
 Arminia Bielefeld,DSC,home
 Arsenal FC,ARS,home
 Associazione Sportiva Roma,ROM,home
 Aston Villa,AVL,home
-Bayern Munich,FCB,home
+Atalanta BC,ATA,home
+Athletic Bilbao,ATH,home
+Atlético de Madrid,ATM,home
+Austria Vienna,AUV,home
+Bayer 04 Leverkusen,B04,home
+Bayern Munich,BAY,home
 Benevento Calcio,BEN,home
 Bologna Football Club 1909,BOL,home
 Borussia Dortmund,BVB,home
+Borussia Mönchengladbach,BMG,home
 Brentford FC,BRE,home
 Brescia Calcio,BRE,home
 Brighton & Hove Albion,BHA,home
 Burnley FC,BUR,home
+CA Osasuna,OSA,home
 CD Leganés,LEG,home
 Cagliari Calcio,CAG,home
 Cardiff City,CAR,home
+Catania FC,CAT,home
+Celta de Vigo,CEL,home
 Cesena FC,CES,home
 Chelsea FC,CHE,home
 Chievo Verona,CHI,home
 Clermont Foot 63,CLE,home
+Como 1907,COM,home
 Coventry City,COV,home
 Crystal Palace,CRY,home
 Cádiz CF,CAD,home
 Córdoba CF,COR,home
 Delfino Pescara 1936,PES,home
+Deportivo Alavés,ALA,home
 Deportivo de La Coruña,DEP,home
 Dijon FCO,DIJ,home
 EA Guingamp,GUI,home
 ESTAC Troyes,TRO,home
+Eintracht Braunschweig,EBS,home
 Eintracht Frankfurt,SGE,home
 Elche CF,ELC,home
 Everton FC,EVE,home
 FC Augsburg,FCA,home
-FC Barcelona,FCB,home
+FC Barcelona,BAR,home
+FC Blau-Weiss Linz,BWL,home
 FC Crotone,CRO,home
 FC Empoli,EMP,home
 FC Girondins Bordeaux,BOR,home
@@ -51,6 +70,7 @@ FC Lorient,LOR,home
 FC Metz,MET,home
 FC Nantes,NAN,home
 FC Schalke 04,S04,home
+FC Sochaux-Montbéliard,SOC,home
 FC St. Pauli,STP,home
 FC Toulouse,TFC,home
 Fortuna Düsseldorf,F95,home
@@ -58,9 +78,11 @@ Frosinone Calcio,FRO,home
 Fulham FC,FUL,home
 Fußballclub Red Bull Salzburg,RBS,home
 GFC Ajaccio,GFCA,home
+Genoa CFC,GEN,home
 Getafe CF,GET,home
 Girona FC,GIR,home
 Granada CF,GCF,home
+Grazer AK 1902,GAK,home
 Hamburger SV,HSV,home
 Hannover 96,H96,home
 Hellas Verona,VER,home
@@ -72,8 +94,12 @@ Inter Milan,INT,home
 Ipswich Town,IPS,home
 Juventus FC,JUV,home
 Karlsruher SC,KSC,home
+LASK,LSC,home
+LOSC Lille,LOS,home
+Le Havre AC,HAC,home
 Leeds United,LEE,home
 Leicester City,LEI,home
+Levante UD,LEV,home
 Liverpool FC,LIV,home
 Luton Town,LUT,home
 Manchester City,MCI,home
@@ -85,6 +111,9 @@ Newcastle United,NEW,home
 Norwich City,NOR,home
 Nottingham Forest,NFO,home
 Nîmes Olympique,NIM,home
+OGC Nice,NIC,home
+Olympique Lyon,OL,home
+Olympique Marseille,OM,home
 Palermo FC,PAL,home
 Paris FC,PFC,home
 Paris Saint-Germain,PSG,home
@@ -92,8 +121,14 @@ Parma Calcio 1913,PAR,home
 Pisa Sporting Club,PIS,home
 Queens Park Rangers,QPR,home
 RB Leipzig,RBL,home
+RC Lens,RCL,home
+RC Strasbourg Alsace,RCS,home
+RCD Espanyol Barcelona,ESP,home
+RCD Mallorca,MLL,home
 Racing Santander,RSA,home
+Rapid Vienna,RAP,home
 Rayo Vallecano,RAY,home
+Real Betis Balompié,BET,home
 Real Madrid,RMA,home
 Real Oviedo,OVI,home
 Real Sociedad,RSO,home
@@ -103,34 +138,53 @@ SC Freiburg,SCF,home
 SC Paderborn 07,SCP,home
 SD Eibar,EIB,home
 SD Huesca,HUE,home
+SK Austria Klagenfurt,AUK,home
 SM Caen,CAE,home
 SPAL,SPA,home
+SSC Napoli,NAP,home
 SV 07 Elversberg,ELV,home
 SV Darmstadt 98,D98,home
+SV Ried,RIE,home
+SV Werder Bremen,SVW,home
 Sevilla FC,SEV,home
 Sheffield United,SHU,home
 Società Sportiva Lazio S.p.A.,LAZ,home
 Southampton FC,SOU,home
 SpVgg Greuther Fürth,SGF,home
 Spezia Calcio,SPE,home
+Sportclub Rheindorf Altach,ALT,home
 Sporting Gijón,GIJ,home
+Sportklub Puntigamer Sturm Graz,STU,home
 Stade Brestois 29,SB29,home
 Stade Reims,REI,home
+Stade Rennais FC,REN,home
 Stoke City,STK,home
+Sunderland AFC,SUN,home
 Swansea City,SWA,home
+TSG 1899 Hoffenheim,TSG,home
+TSV Hartberg,HTB,home
 Thonon Évian Grand Genève FC,EVI,home
 Torino FC,TOR,home
 Tottenham Hotspur,TOT,home
 UC Sampdoria,SAM,home
 UD Almería,ALM,home
 UD Las Palmas,LPA,home
+US Cremonese,CRE,home
+US Lecce,LEC,home
+US Livorno 1915,LVR,home
 US Salernitana 1919,SAL,home
+US Sassuolo,SAS,home
 Udinese Calcio,UDI,home
 Valencia CF,VAL,home
+Valenciennes FC,VLC,home
 Venezia FC,VEN,home
 VfB Stuttgart,VFB,home
 VfL Bochum,BOC,home
+VfL Wolfsburg,WOB,home
 Villarreal CF,VIL,home
+WSG Tirol,WSG,home
 Watford FC,WAT,home
 West Bromwich Albion,WBA,home
+West Ham United,WHU,home
+Wolfsberger AC,WAC,home
 Wolverhampton Wanderers,WOL,home

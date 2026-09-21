@@ -1,12 +1,15 @@
 {
-  "best_test_goal_nll": 2.932933211326599,
-  "best_epoch": 10,
-  "epochs_trained": 20,
-  "architecture": "2_block_transformer_encoder",
+  "best_test_goal_nll": 2.8911312222480774,
+  "best_epoch": 17,
+  "epochs_trained": 27,
+  "architecture": "2_block_pre_ln_transformer_encoder_with_slot_emb",
   "num_transformer_blocks": 2,
   "attention_heads": 4,
   "hidden_dim": 64,
   "player_embedding_dim": 32,
+  "position_embedding_dim": 8,
+  "slot_embedding_dim": 4,
   "output_dim": 32,
+  "same_position_bias": 0.5,
   "trained": true
 }

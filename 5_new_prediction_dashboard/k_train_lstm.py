@@ -1,34 +1,50 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Train the LSTM on the DASHBOARD data and save model + raw predictions.
+"""Train the LSTM and produce weekly predictions for the dashboard.
+
+Modeling logic mirrors the historical training script (d_train_RNN_LSTM.py),
+wired to the dashboard's file layout:
 
 Reads:
     ./nn_input_data/nn_input_*_TRAIN.csv   (full history)
     ./nn_input_data/nn_input_*_TEST.csv    (current upcoming fixtures)
     ./nn_input_data/nn_module_metadata.json
+    ../misc/xgboost_selected_features.json (optional feature filter)
 
 Writes (weekly_results/):
-    lstm_model.pt                (always the latest model)
-    lstm_predictions.csv         (always the latest raw predictions)
+    lstm_model.pt
+    lstm_predictions.csv
+    lstm_summary.json
 
-For the dashboard-facing files (weekly_predictions_latest.csv,
-weekly_predictions_YYYY-MM-DD.csv, lstm_summary.json), run
-l_prepare_shiny_data.py afterwards.
+KEY MODELING NOTE
+-----------------
+The classifier head has repeatedly drifted toward predicting DRAW on the
+upcoming fixtures even though its validation metrics are healthy. The model
+that produced good historical behaviour used a **rate-based decision rule**
+(compare λ_home - λ_away against a draw threshold) rather than the classifier.
+We therefore support two decision paths:
 
-Shared helpers (config, model, data loaders, league resolution, actual-results
-lookup, etc.) are defined here and re-used by l_prepare_shiny_data.py via
-`import k_train_lstm`.
+  - "classifier": classic behaviour. Uses the classifier + rate blend.
+  - "rate":       rate-based only. Uses λ_home - λ_away with a tuned
+                  threshold. Robust when the classifier is untrustworthy.
+
+The config flag `decision_source` selects which one is used for the
+dashboard-facing predictions. The default is "rate" because that's the mode
+that gave stable results historically. The classifier is still trained
+(when draw_weight_scale > 0) so it can be re-enabled without retraining.
+
+Setting `draw_weight_scale = 0.0` disables the DRAW class in the classifier.
+When this is 0, the classifier is forced to pick between HOME and AWAY only,
+which we do NOT want to use for the final decision. In that mode the
+decision path automatically falls back to "rate".
 """
 
 from __future__ import annotations
 
 import json
 import re
-import sys
-import unicodedata
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -45,33 +61,122 @@ from sklearn.metrics import (
 )
 
 
+
+
 # ============================================================================
 # PATHS
 # ============================================================================
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+SCRIPT_DIR = Path(__file__).resolve().parent          # 5_new_prediction_dashboard
 PROJECT_DIR = SCRIPT_DIR.parent
 
-if str(PROJECT_DIR) not in sys.path:
-    sys.path.insert(0, str(PROJECT_DIR))
-
 NN_INPUT_DATA_DIR = SCRIPT_DIR / "nn_input_data"
-UPCOMING_LINEUPS_PATH = SCRIPT_DIR / "upcoming_lineups" / "upcoming_lineups_latest.csv"
-HISTORICAL_MATCH_PATH = PROJECT_DIR / "data" / "big5_matches_fixed.csv"
 WEEKLY_RESULTS_DIR = SCRIPT_DIR / "weekly_results"
 
 META_PATH = NN_INPUT_DATA_DIR / "nn_module_metadata.json"
-SUMMARY_PATH = WEEKLY_RESULTS_DIR / "lstm_summary.json"
+SELECTED_FEATURES_PATH = PROJECT_DIR / "misc" / "xgboost_selected_features.json"
+
 MODEL_PATH = WEEKLY_RESULTS_DIR / "lstm_model.pt"
 PRED_PATH = WEEKLY_RESULTS_DIR / "lstm_predictions.csv"
-WEEKLY_PRED_PATH = WEEKLY_RESULTS_DIR / "weekly_predictions_latest.csv"
-
+SUMMARY_PATH = WEEKLY_RESULTS_DIR / "lstm_summary.json"
 
 DEFAULT_MODULES = ["lineup", "player_stats", "skill_matchups", "match_stats",
                    "league", "season", "matchup"]
 
-OUTCOME_LABEL = {0: "HOME_WIN", 1: "DRAW", 2: "AWAY_WIN"}
+OUTCOME_NAMES = {0: "HOME", 1: "DRAW", 2: "AWAY"}
 
+# Aliases kept for backward compatibility with l_prepare_shiny_data.py
+OUTCOME_LABEL = {0: "HOME_WIN", 1: "DRAW", 2: "AWAY_WIN"}
+ACTUAL_COLS = ["actual_home_goals", "actual_away_goals", "actual_outcome"]
+
+
+# ============================================================================
+# LEAK-PREVENTION FILTERS
+# ============================================================================
+
+_GOAL_SUFFIX_RE = re.compile(r"^(hg|ag)_", re.IGNORECASE)
+_MATCH_STAT_RE = re.compile(r"^(Home|Away)_")
+
+LEAKY_TOKENS = (
+    "actual",
+    "home_goals", "away_goals",
+    "fthg", "ftag",
+    "home_score", "away_score",
+    "outcome", "result",
+)
+
+
+@dataclass
+class LSTMConfig:
+    modules: list[str]
+
+    # Data
+    val_fraction: float = 0.15
+    use_xgb_selected_features: bool = True
+
+    # Architecture
+    hidden_dim: int = 48
+    num_lstm_layers: int = 1
+    rate_head_hidden: int = 24
+    outcome_head_hidden: int = 32
+    dropout: float = 0.3
+    input_dropout: float = 0.15
+
+    # Training
+    epochs: int = 80
+    batch_size: int = 128
+    learning_rate: float = 5e-4
+    weight_decay: float = 1e-3
+    early_stopping_patience: int = 10
+    lr_patience: int = 5
+    lr_factor: float = 0.5
+    min_lr: float = 1e-6
+
+    # Losses
+    outcome_weight: float = 1.0
+    use_full_class_weights: bool = True
+
+    # Class-weight scaling. draw_weight_scale = 0.0 disables DRAW in the
+    # classifier head (its gradient vanishes) — the decision path auto-
+    # switches to "rate" in that case.
+    draw_weight_scale: float = 0.0
+    away_weight_scale: float = 1.00
+    home_weight_scale: float = 1.00
+
+    # Decision
+    decision_source: str = "auto"        # "auto" | "rate" | "classifier"
+    draw_margin_grid: tuple[float, ...] = field(
+        default_factory=lambda: tuple(np.round(np.linspace(0.0, 1.5, 151), 3))
+    )
+    blend_sweep: tuple[float, ...] = field(
+        default_factory=lambda: tuple(np.round(np.linspace(0.0, 1.0, 21), 2))
+    )
+    seed: int = 42
+
+
+# ============================================================================
+# SHARED HELPERS (used by l_prepare_shiny_data.py)
+# ============================================================================
+#
+# These live here so the dashboard has one source of truth for paths, team
+# codes, league resolution, and actual-results population. They're imported
+# by l_prepare_shiny_data.py via `from k_train_lstm import ...`.
+
+import os
+import unicodedata
+
+# --- Paths also used by l_prepare_shiny_data.py -----------------------------
+LATEST_PRED_PATH = WEEKLY_RESULTS_DIR / "weekly_predictions_latest.csv"
+
+# The historical matches file is the source of truth for played results and
+# the league fallback lookup.
+HISTORICAL_MATCH_PATH = PROJECT_DIR / "data" / "big5_matches_fixed.csv"
+
+# Upcoming lineups feed is where team codes/names come from for the
+# dashboard-facing match summary.
+UPCOMING_LINEUPS_PATH = SCRIPT_DIR / "upcoming_lineups" / "upcoming_lineups_latest.csv"
+
+# --- League display labels --------------------------------------------------
 LEAGUE_TAG_MAP = {
     "England Premier League": "premier-league",
     "France Ligue 1": "ligue-1",
@@ -93,102 +198,274 @@ LEAGUE_DISPLAY = {
     "ligue-1": "Ligue 1",
 }
 
-# Columns that hold post-match ground truth in weekly_predictions_*.csv.
-ACTUAL_COLS = ["actual_home_goals", "actual_away_goals", "actual_outcome"]
+
+# --- Small utilities --------------------------------------------------------
+
+def _normalize_name(name):
+    if pd.isna(name):
+        return ""
+    s = unicodedata.normalize("NFKD", str(name))
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = s.lower().strip()
+    s = re.sub(r"[^a-z0-9]+", " ", s)
+    return " ".join(s.split())
 
 
-@dataclass
-class LSTMConfig:
-    modules: list[str]
-    val_fraction: float = 0.15
-    hidden_dim: int = 48
-    num_lstm_layers: int = 1
-    rate_head_hidden: int = 24
-    outcome_head_hidden: int = 32
-    dropout: float = 0.3
-    input_dropout: float = 0.15
-    epochs: int = 80
-    batch_size: int = 128
-    learning_rate: float = 5e-4
-    weight_decay: float = 1e-3
-    early_stopping_patience: int = 10
-    lr_patience: int = 5
-    lr_factor: float = 0.5
-    min_lr: float = 1e-6
-    outcome_weight: float = 1.0
-    use_full_class_weights: bool = True
-    draw_weight_scale: float = 0.80
-    away_weight_scale: float = 0.95
-    home_weight_scale: float = 1.00
-    draw_margin_grid: tuple[float, ...] = field(
-        default_factory=lambda: tuple(np.round(np.linspace(0.0, 0.8, 81), 3))
-    )
-    blend_sweep: tuple[float, ...] = field(
-        default_factory=lambda: tuple(np.round(np.linspace(0.0, 1.0, 21), 2))
-    )
-    seed: int = 42
+def extract_team_codes_from_game_id(game_id):
+    """game_id format: YYYYMMDD_HOME_AWAY"""
+    parts = str(game_id).split("_")
+    if len(parts) >= 3:
+        return parts[1], parts[2]
+    return None, None
 
 
-@dataclass
-class TrainedModel:
-    """Everything downstream scripts need from a training run."""
-    model: LSTMMatchModel
-    config: LSTMConfig
-    home_cols: list[str]
-    away_cols: list[str]
-    other_cols: list[str]
-    home_prior: float
-    away_prior: float
-    draw_margin: float
-    blend_weight: float
-    train_priors: np.ndarray
-    best_epoch: int
-    n_params: int
-    val_balanced_accuracy: float
-    test_keys: list[str]
-    test_home_pred: np.ndarray
-    test_away_pred: np.ndarray
-    test_blend_probs: np.ndarray
-    test_blend_pred: np.ndarray
-    test_df: pd.DataFrame
-    val_outcomes: np.ndarray
-    sweep_results: list[dict]
+def build_team_to_league_from_history():
+    """
+    Build code → standardized league tag by scanning historical matches.
+    Uses the same resolver as the rest of the project so codes match game_ids.
+    """
+    if not HISTORICAL_MATCH_PATH.exists():
+        return {}
 
+    try:
+        from src.team_name_mapping_FINAL import (
+            resolve_team_name,
+            resolve_team_name_fuzzy,
+            soccer_teams,
+        )
+    except ImportError:
+        return {}
 
-# ============================================================================
-# HELPERS
-# ============================================================================
+    normalized_lookup = {}
+    for name, code in soccer_teams.items():
+        normalized_lookup.setdefault(_normalize_name(name), code)
 
-def matchday_anchor_date(game_ids, fallback: datetime | None = None) -> datetime:
-    """Return the Monday of the matchday week for the given game_ids."""
-    if fallback is None:
-        fallback = datetime.now()
+    def resolve(name):
+        if pd.isna(name):
+            return None
+        text = str(name).strip()
+        code = resolve_team_name(text) or resolve_team_name_fuzzy(text)
+        if code:
+            return code
+        return normalized_lookup.get(_normalize_name(text))
 
-    dates: list[datetime] = []
-    for gid in game_ids:
-        if not isinstance(gid, str) or len(gid) < 8:
+    hist = pd.read_csv(HISTORICAL_MATCH_PATH, low_memory=False)
+    if "league" not in hist.columns:
+        return {}
+
+    team_to_league = {}
+    for _, row in hist.iterrows():
+        league_raw = row.get("league")
+        if pd.isna(league_raw):
             continue
-        try:
-            dates.append(datetime.strptime(gid[:8], "%Y%m%d"))
-        except ValueError:
+        league = LEAGUE_TAG_MAP.get(str(league_raw).strip(),
+                                    str(league_raw).strip())
+
+        for side in ("home_team", "away_team"):
+            code = resolve(row.get(side))
+            if code and code not in team_to_league:
+                team_to_league[code] = league
+
+    return team_to_league
+
+
+def load_upcoming_context():
+    """
+    Build:
+      - team_lookup: code → raw-name
+      - league_lookup: game_id → Competition (scraper tag)
+    from upcoming_lineups_latest.csv.
+    """
+    if not UPCOMING_LINEUPS_PATH.exists():
+        return {}, {}
+
+    df = pd.read_csv(UPCOMING_LINEUPS_PATH, low_memory=False)
+
+    team_lookup = {}
+    for _, row in df.iterrows():
+        for side in ("Home", "Away"):
+            code = row.get(f"{side} Team")
+            raw = row.get(f"{side} Team Raw")
+            if (isinstance(code, str) and isinstance(raw, str)
+                    and code.strip() and raw.strip()):
+                team_lookup[code.strip()] = raw.strip()
+
+    league_lookup = {}
+    if "game_id" in df.columns and "Competition" in df.columns:
+        for _, row in df.iterrows():
+            gid = row.get("game_id")
+            comp = row.get("Competition")
+            if (isinstance(gid, str) and isinstance(comp, str)
+                    and gid.strip() and comp.strip()):
+                league_lookup[gid.strip()] = comp.strip()
+
+    return team_lookup, league_lookup
+
+
+def resolve_league_for_game(game_id, league_lookup, team_to_league):
+    """
+    Resolve league for a game_id with multiple fallbacks:
+      1. Scraper's Competition tag (game_id → league)
+      2. Either team code → league from historical team→league map
+      3. infer_league_and_season (legacy)
+      4. "unknown"
+    """
+    league = league_lookup.get(game_id)
+    if league:
+        return league
+
+    home_code, away_code = extract_team_codes_from_game_id(game_id)
+    for code in (home_code, away_code):
+        if code and code in team_to_league:
+            return team_to_league[code]
+
+    try:
+        from src.game_id_context import infer_league_and_season
+        ctx = infer_league_and_season(game_id)
+        if isinstance(ctx, dict):
+            league = ctx.get("league")
+            if league and league.lower() != "unknown":
+                return league
+    except Exception:
+        pass
+
+    return "unknown"
+
+
+def load_actual_results_from_history(path: Path = HISTORICAL_MATCH_PATH):
+    """
+    Read big5_matches_fixed.csv and return {game_id: (home_goals, away_goals)}
+    for every match that has a valid score recorded.
+    """
+    if not path.exists():
+        print(f"⚠ {path} not found — cannot populate actual goals.")
+        return {}
+
+    hist = pd.read_csv(path, low_memory=False)
+
+    home_candidates = ["HG", "FTHG", "Home_goals", "home_goals"]
+    away_candidates = ["AG", "FTAG", "Away_goals", "away_goals"]
+
+    hg_col = next((c for c in home_candidates if c in hist.columns), None)
+    ag_col = next((c for c in away_candidates if c in hist.columns), None)
+
+    if "game_id" not in hist.columns or hg_col is None or ag_col is None:
+        print(f"⚠ {path} is missing game_id or goal columns.")
+        return {}
+
+    lookup = {}
+    for _, row in hist.iterrows():
+        gid = row.get("game_id")
+        if not isinstance(gid, str) or not gid.strip():
+            continue
+        hg = pd.to_numeric(row.get(hg_col), errors="coerce")
+        ag = pd.to_numeric(row.get(ag_col), errors="coerce")
+        if pd.isna(hg) or pd.isna(ag):
+            continue
+        lookup[gid.strip()] = (int(hg), int(ag))
+
+    print(f"  Loaded {len(lookup)} historical results from {path.name}")
+    return lookup
+
+
+def update_actuals_from_results(dated_path: Path,
+                                results: dict,
+                                overwrite: bool = False) -> int:
+    """
+    Fill in actual_home_goals / actual_away_goals / actual_outcome in a
+    dated weekly_predictions CSV.
+    """
+    if not dated_path.exists():
+        return 0
+
+    try:
+        df = pd.read_csv(dated_path)
+    except Exception as e:
+        print(f"⚠ Could not read {dated_path.name}: {e}")
+        return 0
+
+    if df.empty or "game_id" not in df.columns:
+        return 0
+
+    if "actual_home_goals" not in df.columns:
+        df["actual_home_goals"] = pd.Series([pd.NA] * len(df), dtype="Int64")
+    else:
+        df["actual_home_goals"] = pd.to_numeric(
+            df["actual_home_goals"], errors="coerce"
+        ).astype("Int64")
+
+    if "actual_away_goals" not in df.columns:
+        df["actual_away_goals"] = pd.Series([pd.NA] * len(df), dtype="Int64")
+    else:
+        df["actual_away_goals"] = pd.to_numeric(
+            df["actual_away_goals"], errors="coerce"
+        ).astype("Int64")
+
+    if "actual_outcome" not in df.columns:
+        df["actual_outcome"] = pd.Series([pd.NA] * len(df), dtype="string")
+    else:
+        df["actual_outcome"] = df["actual_outcome"].astype("string")
+
+    already_filled = df["actual_home_goals"].notna()
+
+    updated = 0
+    for gid, (hg, ag) in results.items():
+        mask = df["game_id"].astype(str) == str(gid)
+        if not mask.any():
+            continue
+        if not overwrite:
+            mask = mask & ~already_filled
+        if not mask.any():
             continue
 
-    anchor = min(dates) if dates else fallback
-    return anchor - timedelta(days=anchor.weekday())
+        df.loc[mask, "actual_home_goals"] = int(hg)
+        df.loc[mask, "actual_away_goals"] = int(ag)
+        if hg > ag:
+            outcome = "HOME_WIN"
+        elif hg == ag:
+            outcome = "DRAW"
+        else:
+            outcome = "AWAY_WIN"
+        df.loc[mask, "actual_outcome"] = outcome
+        updated += int(mask.sum())
+
+    if updated > 0:
+        df.to_csv(dated_path, index=False, na_rep="")
+    return updated
 
 
 def dated_output_paths(base_dir: Path,
                        game_ids=None,
-                       run_date: datetime | None = None):
-    """Return (dated_path, latest_path) using the matchday anchor as the stamp."""
-    anchor = matchday_anchor_date(game_ids if game_ids is not None else [],
-                                  fallback=run_date)
+                       run_date=None):
+    """
+    Return (dated_path, latest_path) using the Monday of the matchday week
+    as the stamp.
+    """
+    from datetime import datetime as _dt, timedelta as _td
+
+    if run_date is None:
+        run_date = _dt.now()
+
+    dates = []
+    for gid in (game_ids or []):
+        if not isinstance(gid, str) or len(gid) < 8:
+            continue
+        try:
+            dates.append(_dt.strptime(gid[:8], "%Y%m%d"))
+        except ValueError:
+            continue
+
+    anchor = min(dates) if dates else run_date
+    anchor = anchor - _td(days=anchor.weekday())
     stamp = anchor.strftime("%Y-%m-%d")
     return (
         base_dir / f"weekly_predictions_{stamp}.csv",
         base_dir / "weekly_predictions_latest.csv",
     )
 
+# ============================================================================
+# DATA LOADING
+# ============================================================================
 
 def set_seed(seed):
     np.random.seed(seed)
@@ -196,15 +473,11 @@ def set_seed(seed):
     torch.cuda.manual_seed_all(seed)
 
 
-def load_module_meta():
-    if not META_PATH.exists():
-        raise FileNotFoundError(f"Missing metadata file {META_PATH}.")
-    return json.loads(META_PATH.read_text(encoding="utf-8"))
+def load_selected_features():
+    if SELECTED_FEATURES_PATH.exists():
+        return set(json.loads(SELECTED_FEATURES_PATH.read_text(encoding="utf-8")))
+    return None
 
-
-# ============================================================================
-# DATA LOADING
-# ============================================================================
 
 def _load_split_frame(module_name, split):
     path = NN_INPUT_DATA_DIR / f"nn_input_{module_name}_{split}.csv"
@@ -215,18 +488,35 @@ def _load_split_frame(module_name, split):
 
 def _feature_columns(frame):
     exclude = {"game_id", "HG", "AG", "match_id"}
-    return [c for c in frame.columns if c not in exclude]
+    cols = []
+    for c in frame.columns:
+        if c in exclude:
+            continue
+        if _GOAL_SUFFIX_RE.match(c):
+            continue
+        if _MATCH_STAT_RE.match(c):
+            continue
+        cl = c.lower()
+        if any(tok in cl for tok in LEAKY_TOKENS):
+            continue
+        cols.append(c)
+    return cols
 
 
-def load_merged_split(split, modules):
+def load_merged_split(split, modules, feature_filter=None):
     merged = None
     for mn in modules:
         frame = _load_split_frame(mn, split)
         frame = frame.copy().drop_duplicates(subset=["game_id"], keep="first")
+
         cols = _feature_columns(frame)
+        if feature_filter is not None:
+            cols = [c for c in cols if c in feature_filter]
+
         keep_cols = ["game_id"] + cols
-        if "HG" in frame.columns and "AG" in frame.columns and split == "TRAIN":
-            keep_cols = ["game_id", "HG", "AG"] + cols
+        for label_col in ("HG", "AG"):
+            if label_col in frame.columns and label_col not in keep_cols:
+                keep_cols.append(label_col)
         frame = frame[keep_cols]
 
         if merged is None:
@@ -237,6 +527,18 @@ def load_merged_split(split, modules):
 
     if merged is None or merged.empty:
         raise ValueError(f"No merged rows available for split={split}.")
+
+    leaky = [c for c in merged.columns
+             if c not in {"game_id", "HG", "AG"}
+             and (_GOAL_SUFFIX_RE.match(c) or _MATCH_STAT_RE.match(c))]
+    if leaky:
+        print(f"\n⚠ WARNING: dropping {len(leaky)} leaky column(s) from "
+              f"the merged feature set:")
+        for c in leaky[:15]:
+            print(f"    {c}")
+        if len(leaky) > 15:
+            print(f"    ... and {len(leaky) - 15} more")
+        merged = merged.drop(columns=leaky)
 
     for col in ["HG", "AG"]:
         if col not in merged.columns:
@@ -285,271 +587,12 @@ def split_home_away(feature_cols):
 
 
 # ============================================================================
-# CONTEXT LOOKUPS (team names + league)
-# ============================================================================
-
-def load_upcoming_context():
-    """
-    Build:
-      - team_lookup: code → raw-name
-      - league_lookup: game_id → Competition (scraper tag)
-    from upcoming_lineups_latest.csv.
-    """
-    if not UPCOMING_LINEUPS_PATH.exists():
-        return {}, {}
-
-    df = pd.read_csv(UPCOMING_LINEUPS_PATH, low_memory=False)
-
-    team_lookup = {}
-    for _, row in df.iterrows():
-        for side in ("Home", "Away"):
-            code = row.get(f"{side} Team")
-            raw = row.get(f"{side} Team Raw")
-            if isinstance(code, str) and isinstance(raw, str) and code.strip() and raw.strip():
-                team_lookup[code.strip()] = raw.strip()
-
-    league_lookup = {}
-    if "game_id" in df.columns and "Competition" in df.columns:
-        for _, row in df.iterrows():
-            gid = row.get("game_id")
-            comp = row.get("Competition")
-            if isinstance(gid, str) and isinstance(comp, str) and gid.strip() and comp.strip():
-                league_lookup[gid.strip()] = comp.strip()
-
-    return team_lookup, league_lookup
-
-
-def _normalize_name(name):
-    if pd.isna(name):
-        return ""
-    s = unicodedata.normalize("NFKD", str(name))
-    s = "".join(c for c in s if not unicodedata.combining(c))
-    s = s.lower().strip()
-    s = re.sub(r"[^a-z0-9]+", " ", s)
-    return " ".join(s.split())
-
-
-def build_team_to_league_from_history():
-    """
-    Build code → standardized league tag by scanning historical matches.
-    Uses the same resolver as the rest of the project so codes match game_ids.
-    """
-    if not HISTORICAL_MATCH_PATH.exists():
-        return {}
-
-    try:
-        from src.team_name_mapping_FINAL import (
-            resolve_team_name,
-            resolve_team_name_fuzzy,
-            soccer_teams,
-        )
-    except ImportError:
-        return {}
-
-    normalized_lookup = {}
-    for name, code in soccer_teams.items():
-        normalized_lookup.setdefault(_normalize_name(name), code)
-
-    def resolve(name):
-        if pd.isna(name):
-            return None
-        text = str(name).strip()
-        code = resolve_team_name(text) or resolve_team_name_fuzzy(text)
-        if code:
-            return code
-        return normalized_lookup.get(_normalize_name(text))
-
-    hist = pd.read_csv(HISTORICAL_MATCH_PATH, low_memory=False)
-    if "league" not in hist.columns:
-        return {}
-
-    team_to_league = {}
-    for _, row in hist.iterrows():
-        league_raw = row.get("league")
-        if pd.isna(league_raw):
-            continue
-        league = LEAGUE_TAG_MAP.get(str(league_raw).strip(), str(league_raw).strip())
-
-        for side in ("home_team", "away_team"):
-            code = resolve(row.get(side))
-            if code and code not in team_to_league:
-                team_to_league[code] = league
-
-    return team_to_league
-
-
-def extract_team_codes_from_game_id(game_id):
-    """game_id format: YYYYMMDD_HOME_AWAY"""
-    parts = str(game_id).split("_")
-    if len(parts) >= 3:
-        return parts[1], parts[2]
-    return None, None
-
-
-def resolve_league_for_game(game_id, league_lookup, team_to_league):
-    """
-    Resolve league for a game_id with multiple fallbacks:
-      1. Scraper's Competition tag (game_id → league)
-      2. Either team code → league from historical team→league map
-      3. infer_league_and_season (legacy)
-      4. "unknown"
-    """
-    league = league_lookup.get(game_id)
-    if league:
-        return league
-
-    home_code, away_code = extract_team_codes_from_game_id(game_id)
-    for code in (home_code, away_code):
-        if code and code in team_to_league:
-            return team_to_league[code]
-
-    try:
-        from src.game_id_context import infer_league_and_season
-        ctx = infer_league_and_season(game_id)
-        if isinstance(ctx, dict):
-            league = ctx.get("league")
-            if league and league.lower() != "unknown":
-                return league
-    except Exception:
-        pass
-
-    return "unknown"
-
-
-# ============================================================================
-# ACTUAL-RESULTS LOOKUP
-# ============================================================================
-
-def load_actual_results_from_history(
-    path: Path = HISTORICAL_MATCH_PATH,
-) -> dict[str, tuple[int, int]]:
-    """
-    Read big5_matches_fixed.csv and return {game_id: (home_goals, away_goals)}
-    for every match that has a valid score recorded.
-
-    Rows with missing / non-numeric goals are skipped.
-    """
-    if not path.exists():
-        print(f"⚠ {path} not found — cannot populate actual goals.")
-        return {}
-
-    hist = pd.read_csv(path, low_memory=False)
-
-    if "game_id" not in hist.columns:
-        print(f"⚠ {path} has no 'game_id' column.")
-        return {}
-
-    if "Home_goals" not in hist.columns or "Away_goals" not in hist.columns:
-        print(f"⚠ {path} is missing 'Home_goals' / 'Away_goals' columns.")
-        return {}
-
-    lookup: dict[str, tuple[int, int]] = {}
-    for _, row in hist.iterrows():
-        gid = row.get("game_id")
-        if not isinstance(gid, str) or not gid.strip():
-            continue
-        hg = pd.to_numeric(row.get("Home_goals"), errors="coerce")
-        ag = pd.to_numeric(row.get("Away_goals"), errors="coerce")
-        if pd.isna(hg) or pd.isna(ag):
-            continue
-        lookup[gid.strip()] = (int(hg), int(ag))
-
-    print(f"  Loaded {len(lookup)} historical results from {path.name}")
-    return lookup
-
-
-def update_actuals_from_results(dated_path: Path,
-                                results: dict[str, tuple[int, int]],
-                                overwrite: bool = False) -> int:
-    """
-    Fill in actual_home_goals / actual_away_goals / actual_outcome in a
-    dated weekly_predictions CSV.
-
-    Parameters
-    ----------
-    dated_path : Path
-        Path to a weekly_predictions_YYYY-MM-DD.csv file.
-    results : dict
-        Mapping game_id -> (home_goals, away_goals).
-    overwrite : bool
-        If False (default), rows that already have actual_home_goals set
-        are left untouched (safe for hand-corrected data). If True,
-        existing values are replaced.
-
-    Returns
-    -------
-    int
-        Number of rows updated.
-    """
-    if not dated_path.exists():
-        return 0
-
-    try:
-        df = pd.read_csv(dated_path)
-    except Exception as e:
-        print(f"⚠ Could not read {dated_path.name}: {e}")
-        return 0
-
-    if df.empty or "game_id" not in df.columns:
-        return 0
-
-    # --- Ensure the three placeholder columns exist with the right dtypes ---
-    # actual_home_goals / actual_away_goals: nullable Int64 (holds NA + ints).
-    # actual_outcome: nullable string ("HOME_WIN" / "DRAW" / "AWAY_WIN").
-    if "actual_home_goals" not in df.columns:
-        df["actual_home_goals"] = pd.Series([pd.NA] * len(df), dtype="Int64")
-    else:
-        df["actual_home_goals"] = pd.to_numeric(
-            df["actual_home_goals"], errors="coerce"
-        ).astype("Int64")
-
-    if "actual_away_goals" not in df.columns:
-        df["actual_away_goals"] = pd.Series([pd.NA] * len(df), dtype="Int64")
-    else:
-        df["actual_away_goals"] = pd.to_numeric(
-            df["actual_away_goals"], errors="coerce"
-        ).astype("Int64")
-
-    if "actual_outcome" not in df.columns:
-        df["actual_outcome"] = pd.Series([pd.NA] * len(df), dtype="string")
-    else:
-        df["actual_outcome"] = df["actual_outcome"].astype("string")
-
-    # Pre-mark existing values so we don't re-process them when overwrite=False
-    already_filled = df["actual_home_goals"].notna()
-
-    updated = 0
-    for gid, (hg, ag) in results.items():
-        mask = df["game_id"].astype(str) == str(gid)
-        if not mask.any():
-            continue
-        if not overwrite:
-            mask = mask & ~already_filled
-        if not mask.any():
-            continue
-
-        df.loc[mask, "actual_home_goals"] = int(hg)
-        df.loc[mask, "actual_away_goals"] = int(ag)
-        if hg > ag:
-            outcome = "HOME_WIN"
-        elif hg == ag:
-            outcome = "DRAW"
-        else:
-            outcome = "AWAY_WIN"
-        df.loc[mask, "actual_outcome"] = outcome
-        updated += int(mask.sum())
-
-    if updated > 0:
-        df.to_csv(dated_path, index=False, na_rep="")
-    return updated
-
-
-# ============================================================================
 # DATASET
 # ============================================================================
 
 class MatchDataset(Dataset):
-    def __init__(self, frame, home_cols, away_cols, other_cols):
+    def __init__(self, frame, home_cols, away_cols, other_cols,
+                 require_labels=True):
         self.keys = frame["game_id"].astype(str).values
         self.x_home = torch.tensor(frame[home_cols].astype(float).values, dtype=torch.float32)
         self.x_away = torch.tensor(frame[away_cols].astype(float).values, dtype=torch.float32)
@@ -557,16 +600,24 @@ class MatchDataset(Dataset):
             self.x_other = torch.tensor(frame[other_cols].astype(float).values, dtype=torch.float32)
         else:
             self.x_other = torch.zeros(len(frame), 0, dtype=torch.float32)
-        self.hg = torch.tensor(frame["HG"].astype(float).values, dtype=torch.float32)
-        self.ag = torch.tensor(frame["AG"].astype(float).values, dtype=torch.float32)
 
-        hg_np = frame["HG"].values
-        ag_np = frame["AG"].values
-        outcomes = np.where(
-            pd.isna(hg_np) | pd.isna(ag_np), -1,
-            np.where(hg_np > ag_np, 0, np.where(hg_np == ag_np, 1, 2))
-        )
-        self.outcome = torch.tensor(outcomes, dtype=torch.long)
+        if require_labels and "HG" in frame.columns and "AG" in frame.columns:
+            self.hg = torch.tensor(
+                pd.to_numeric(frame["HG"], errors="coerce").fillna(0.0).values,
+                dtype=torch.float32,
+            )
+            self.ag = torch.tensor(
+                pd.to_numeric(frame["AG"], errors="coerce").fillna(0.0).values,
+                dtype=torch.float32,
+            )
+            self.outcome = torch.tensor(
+                outcome_labels(self.hg.numpy(), self.ag.numpy()),
+                dtype=torch.long,
+            )
+        else:
+            self.hg = torch.zeros(len(frame), dtype=torch.float32)
+            self.ag = torch.zeros(len(frame), dtype=torch.float32)
+            self.outcome = torch.full((len(frame),), -1, dtype=torch.long)
 
     def __len__(self):
         return len(self.keys)
@@ -675,7 +726,18 @@ def combined_loss(lam_h, lam_a, outcome_logits, hg, ag, outcome,
                   outcome_weight=1.0, class_weights=None):
     poisson = F.poisson_nll_loss(lam_h, hg, log_input=False, full=True) + \
               F.poisson_nll_loss(lam_a, ag, log_input=False, full=True)
-    ce = F.cross_entropy(outcome_logits, outcome, weight=class_weights)
+
+    if class_weights is not None and class_weights[1].item() == 0.0:
+        # DRAW disabled: only train the classifier on HOME and AWAY examples.
+        mask = outcome != 1
+        if mask.any():
+            ce = F.cross_entropy(outcome_logits[mask], outcome[mask],
+                                 weight=class_weights)
+        else:
+            ce = torch.tensor(0.0, device=outcome_logits.device)
+    else:
+        ce = F.cross_entropy(outcome_logits, outcome, weight=class_weights)
+
     return poisson + outcome_weight * ce
 
 
@@ -687,10 +749,9 @@ def compute_metrics(model, loader, device, class_weights=None):
 
     with torch.no_grad():
         for batch in loader:
+            batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
             if (batch["outcome"] < 0).any():
                 continue
-
-            batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
             lam_h, lam_a, outcome_logits = model(batch["x_home"], batch["x_away"], batch["x_other"])
             loss = combined_loss(lam_h, lam_a, outcome_logits,
                                   batch["HG"], batch["AG"], batch["outcome"],
@@ -724,6 +785,52 @@ def compute_metrics(model, loader, device, class_weights=None):
     }
 
 
+# ============================================================================
+# DECISION RULES
+# ============================================================================
+
+def rates_to_probs(lam_h, lam_a, margin):
+    """
+    Convert expected goals to an outcome probability using a soft temperature
+    model.
+    """
+    diff = lam_h - lam_a
+    k = 2.0
+    exp_h = np.exp(k * (diff - margin))
+    exp_a = np.exp(k * (-diff - margin))
+    exp_d = np.ones_like(diff)
+    total = exp_h + exp_a + exp_d
+    probs = np.zeros((len(lam_h), 3))
+    probs[:, 0] = exp_h / total
+    probs[:, 2] = exp_a / total
+    probs[:, 1] = exp_d / total
+    return probs
+
+
+def rate_based_predictions(lam_h, lam_a, margin):
+    """Return the hard class assignment using only the rate difference."""
+    diff = lam_h - lam_a
+    pred = np.full(len(diff), 1, dtype=int)   # default: DRAW
+    pred[diff > margin] = 0
+    pred[diff < -margin] = 2
+    return pred
+
+
+def tune_draw_margin(lam_h, lam_a, hg, ag, margins):
+    """
+    Pick the threshold that maximises balanced accuracy on the given data.
+    """
+    true = outcome_labels(hg, ag)
+    best_margin, best_bal = 0.0, -1.0
+    for margin in margins:
+        pred = rate_based_predictions(lam_h, lam_a, margin)
+        bal = balanced_accuracy_score(true, pred)
+        if bal > best_bal:
+            best_bal = bal
+            best_margin = float(margin)
+    return best_margin, best_bal
+
+
 def prior_correct_probs(probs, train_priors, target_priors):
     probs = np.clip(probs, 1e-8, None)
     correction = target_priors / np.clip(train_priors, 1e-8, None)
@@ -732,40 +839,25 @@ def prior_correct_probs(probs, train_priors, target_priors):
     return corrected
 
 
-def rates_to_probs(lam_h, lam_a, margin):
-    probs = np.zeros((len(lam_h), 3))
-    diff = lam_h - lam_a
-    probs[:, 0] = (diff > margin).astype(float)
-    probs[:, 2] = (diff < -margin).astype(float)
-    probs[:, 1] = 1.0 - probs[:, 0] - probs[:, 2]
-    return probs
-
-
-def tune_draw_margin(lam_h, lam_a, hg, ag, margins):
-    true = outcome_labels(hg, ag)
-    best_margin, best_bal = 0.0, -1.0
-    for margin in margins:
-        pred = np.where(lam_h > lam_a + margin, 0,
-                        np.where(lam_a > lam_h + margin, 2, 1))
-        bal = balanced_accuracy_score(true, pred)
-        if bal > best_bal:
-            best_bal = bal
-            best_margin = float(margin)
-    return best_margin, best_bal
-
-
-def sweep_blend_weights(clf_probs, rate_probs, y_true, weights, objective="balanced_accuracy"):
+def sweep_blend_weights(clf_probs, rate_probs, y_true, weights,
+                        objective="balanced_accuracy"):
     results = []
     for w in weights:
         pred = np.argmax(w * clf_probs + (1 - w) * rate_probs, axis=1)
         acc = accuracy_score(y_true, pred)
         bal = balanced_accuracy_score(y_true, pred)
         mf1 = f1_score(y_true, pred, average="macro", zero_division=0)
-        score = bal if objective == "balanced_accuracy" else (
-            mf1 if objective == "macro_f1" else acc)
+        if objective == "balanced_accuracy":
+            score = bal
+        elif objective == "macro_f1":
+            score = mf1
+        else:
+            score = acc
         results.append({
-            "weight_clf": float(w), "accuracy": float(acc),
-            "balanced_accuracy": float(bal), "macro_f1": float(mf1),
+            "weight_clf": float(w),
+            "accuracy": float(acc),
+            "balanced_accuracy": float(bal),
+            "macro_f1": float(mf1),
             "score": float(score),
         })
     results.sort(key=lambda r: r["score"], reverse=True)
@@ -773,17 +865,25 @@ def sweep_blend_weights(clf_probs, rate_probs, y_true, weights, objective="balan
 
 
 # ============================================================================
-# TRAINING (in-memory only — no file writes)
+# TRAINING
 # ============================================================================
 
-def train_model(config: LSTMConfig, device) -> TrainedModel:
-    """Train an LSTM on the prepared splits and return the trained artefacts."""
+def train_lstm(config: LSTMConfig, device):
     print("=" * 78)
     print("TRAINING LSTM ON DASHBOARD DATA")
     print("=" * 78)
 
-    train_full = load_merged_split("TRAIN", config.modules)
-    test_df = load_merged_split("TEST", config.modules)
+    # ------------------------------------------------------------------
+    # Load data
+    # ------------------------------------------------------------------
+    selected = load_selected_features() if config.use_xgb_selected_features else None
+    if selected is not None:
+        print(f"Using XGBoost-selected feature set: {len(selected)} features")
+    else:
+        print("Using all available features (no XGBoost selection applied)")
+
+    train_full = load_merged_split("TRAIN", config.modules, feature_filter=selected)
+    test_df = load_merged_split("TEST", config.modules, feature_filter=selected)
     train_df, val_df = split_train_val(train_full, config.val_fraction)
 
     all_feature_cols = [c for c in train_df.columns if c not in {"game_id", "HG", "AG"}]
@@ -804,15 +904,27 @@ def train_model(config: LSTMConfig, device) -> TrainedModel:
     train_outcomes = outcome_labels(train_df["HG"].values, train_df["AG"].values)
     val_outcomes = outcome_labels(val_df["HG"].values, val_df["AG"].values)
 
-    class_weights = compute_class_weights(train_outcomes,
-                                           use_full=config.use_full_class_weights).to(device)
+    # --- Class weights --------------------------------------------------
+    class_weights = compute_class_weights(
+        train_outcomes, use_full=config.use_full_class_weights
+    ).to(device)
     class_weights = class_weights * torch.tensor(
         [config.home_weight_scale, config.draw_weight_scale, config.away_weight_scale],
-        dtype=torch.float32, device=device
+        dtype=torch.float32, device=device,
     )
-    print(f"\nClass weights (scaled): {[round(w, 3) for w in class_weights.tolist()]}")
+    draw_disabled = class_weights[1].item() == 0.0
+    if draw_disabled:
+        print("\n⚠ DRAW class weight is 0 — the classifier head cannot learn "
+              "DRAW. Decision path will be rate-based.")
+    print(f"\nClass weights: {[round(w, 3) for w in class_weights.tolist()]}")
 
-    print("\nTraining outcome distribution:")
+    # Decide the decision path
+    decision_source = config.decision_source
+    if decision_source == "auto":
+        decision_source = "rate" if draw_disabled else "classifier"
+    print(f"Decision source: {decision_source}")
+
+    print("\nTrue outcome distribution:")
     for name, outcomes in [("Train", train_outcomes), ("Val", val_outcomes)]:
         counts = np.bincount(outcomes, minlength=3)
         pcts = 100.0 * counts / counts.sum()
@@ -820,14 +932,20 @@ def train_model(config: LSTMConfig, device) -> TrainedModel:
               f"DRAW {counts[1]:>5} ({pcts[1]:>4.1f}%)  "
               f"AWAY {counts[2]:>5} ({pcts[2]:>4.1f}%)")
 
-    train_ds = MatchDataset(train_df, home_cols, away_cols, other_cols)
-    val_ds = MatchDataset(val_df, home_cols, away_cols, other_cols)
-    test_ds = MatchDataset(test_df, home_cols, away_cols, other_cols)
+    # ------------------------------------------------------------------
+    # Datasets
+    # ------------------------------------------------------------------
+    train_ds = MatchDataset(train_df, home_cols, away_cols, other_cols, require_labels=True)
+    val_ds = MatchDataset(val_df, home_cols, away_cols, other_cols, require_labels=True)
+    test_ds = MatchDataset(test_df, home_cols, away_cols, other_cols, require_labels=False)
 
     train_loader = DataLoader(train_ds, batch_size=config.batch_size, shuffle=True, collate_fn=collate)
     val_loader = DataLoader(val_ds, batch_size=config.batch_size, shuffle=False, collate_fn=collate)
     test_loader = DataLoader(test_ds, batch_size=config.batch_size, shuffle=False, collate_fn=collate)
 
+    # ------------------------------------------------------------------
+    # Model
+    # ------------------------------------------------------------------
     model = LSTMMatchModel(
         home_dim=len(home_cols), away_dim=len(away_cols),
         other_dim=len(other_cols), config=config,
@@ -845,7 +963,10 @@ def train_model(config: LSTMConfig, device) -> TrainedModel:
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"\nModel parameters: {n_params:,}")
 
-    best_val_bal = -1.0
+    # ------------------------------------------------------------------
+    # Training loop — track the metric that matches the decision path
+    # ------------------------------------------------------------------
+    best_val_metric = -1.0
     best_state = None
     best_epoch = 0
     epochs_no_improve = 0
@@ -867,11 +988,41 @@ def train_model(config: LSTMConfig, device) -> TrainedModel:
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=3.0)
             optimizer.step()
 
-        val_m = compute_metrics(model, val_loader, device, class_weights)
-        scheduler.step(val_m["loss"])
+        # --- Validation using the chosen decision path ------------------
+        model.eval()
+        val_home_pred, val_away_pred = [], []
+        val_clf_pred, val_true = [], []
+        with torch.no_grad():
+            for batch in val_loader:
+                batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
+                if (batch["outcome"] < 0).any():
+                    continue
+                lam_h, lam_a, logits = model(batch["x_home"], batch["x_away"], batch["x_other"])
+                val_home_pred.extend(lam_h.cpu().numpy().tolist())
+                val_away_pred.extend(lam_a.cpu().numpy().tolist())
+                val_clf_pred.extend(torch.argmax(logits, dim=1).cpu().numpy().tolist())
+                val_true.extend(batch["outcome"].cpu().numpy().tolist())
 
-        if val_m["balanced_accuracy"] > best_val_bal + 1e-4:
-            best_val_bal = val_m["balanced_accuracy"]
+        val_home_pred = np.array(val_home_pred)
+        val_away_pred = np.array(val_away_pred)
+        val_true = np.array(val_true)
+
+        # Tune margin on the current model's validation predictions
+        draw_margin_now, val_bal_rate = tune_draw_margin(
+            val_home_pred, val_away_pred,
+            val_df["HG"].values, val_df["AG"].values,
+            config.draw_margin_grid,
+        )
+
+        if decision_source == "rate":
+            val_metric = val_bal_rate
+        else:
+            val_metric = balanced_accuracy_score(val_true, val_clf_pred)
+
+        scheduler.step(-val_metric)
+
+        if val_metric > best_val_metric + 1e-4:
+            best_val_metric = val_metric
             best_epoch = epoch
             epochs_no_improve = 0
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
@@ -881,28 +1032,94 @@ def train_model(config: LSTMConfig, device) -> TrainedModel:
         lr_now = optimizer.param_groups[0]['lr']
         if epoch % 5 == 0 or epoch == 1:
             print(f"  Ep {epoch:03d}/{config.epochs} | "
-                  f"ValAcc {val_m['accuracy']:.3f} ValBal {val_m['balanced_accuracy']:.3f} "
-                  f"ValF1 {val_m['macro_f1']:.3f} | "
-                  f"λh {val_m['mean_home_rate']:.2f} λa {val_m['mean_away_rate']:.2f} | "
+                  f"ValBal(rate) {val_bal_rate:.3f} | "
+                  f"margin {draw_margin_now:.3f} | "
+                  f"λh {val_home_pred.mean():.2f} λa {val_away_pred.mean():.2f} | "
                   f"LR {lr_now:.1e}")
 
         if epochs_no_improve >= config.early_stopping_patience:
-            print(f"  ⏹ Early stop at epoch {epoch} (best val balanced acc {best_val_bal:.4f})")
+            print(f"  ⏹ Early stop at epoch {epoch} (best val {best_val_metric:.4f})")
             break
 
     if best_state is not None:
         model.load_state_dict(best_state)
         print(f"  ✓ Restored best model from epoch {best_epoch}")
 
-    # ---- Test predictions ----
+    # ------------------------------------------------------------------
+    # Final validation pass to tune margin on the restored model
+    # ------------------------------------------------------------------
     model.eval()
+    val_home_pred, val_away_pred = [], []
+    val_probs_list = []
+    with torch.no_grad():
+        for batch in val_loader:
+            batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
+            lam_h, lam_a, logits = model(batch["x_home"], batch["x_away"], batch["x_other"])
+            val_home_pred.extend(lam_h.cpu().numpy().tolist())
+            val_away_pred.extend(lam_a.cpu().numpy().tolist())
+            val_probs_list.append(F.softmax(logits, dim=1).cpu().numpy())
+
+    val_home_pred = np.array(val_home_pred)
+    val_away_pred = np.array(val_away_pred)
+    val_probs_raw = np.vstack(val_probs_list)
+
+    train_priors = np.bincount(train_outcomes, minlength=3).astype(float)
+    train_priors /= train_priors.sum()
+    val_probs_corrected = prior_correct_probs(val_probs_raw, train_priors, train_priors)
+
+    draw_margin, val_bal = tune_draw_margin(
+        val_home_pred, val_away_pred,
+        val_df["HG"].values, val_df["AG"].values,
+        config.draw_margin_grid,
+    )
+    print(f"\nBest draw margin (val): {draw_margin:.3f} "
+          f"(val balanced acc {val_bal:.4f})")
+
+    val_rate_probs = rates_to_probs(val_home_pred, val_away_pred, draw_margin)
+    val_rate_pred = rate_based_predictions(val_home_pred, val_away_pred, draw_margin)
+    val_clf_pred = np.argmax(val_probs_corrected, axis=1)
+
+    # ---- Validation metrics for both paths ----
+    def _summary(y_true, y_pred):
+        return {
+            "accuracy": float(accuracy_score(y_true, y_pred)),
+            "balanced_accuracy": float(balanced_accuracy_score(y_true, y_pred)),
+            "macro_f1": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        }
+
+    val_rate_m = _summary(val_outcomes, val_rate_pred)
+    val_clf_m = _summary(val_outcomes, val_clf_pred)
+
+    # Blend sweep (informational only when decision_source == "rate")
+    sweep_results = sweep_blend_weights(
+        val_probs_corrected, val_rate_probs, val_outcomes,
+        config.blend_sweep, objective="balanced_accuracy",
+    )
+    best_blend = sweep_results[0]
+    val_blend_pred = np.argmax(
+        best_blend["weight_clf"] * val_probs_corrected
+        + (1 - best_blend["weight_clf"]) * val_rate_probs, axis=1
+    )
+    val_blend_m = _summary(val_outcomes, val_blend_pred)
+
+    print("\n  Validation metrics by path:")
+    print(f"  {'Rate-based':>32}  {val_rate_m['accuracy']:>10.3f}  "
+          f"{val_rate_m['balanced_accuracy']:>10.3f}  {val_rate_m['macro_f1']:>10.3f}")
+    print(f"  {'Classifier (prior-corrected)':>32}  {val_clf_m['accuracy']:>10.3f}  "
+          f"{val_clf_m['balanced_accuracy']:>10.3f}  {val_clf_m['macro_f1']:>10.3f}")
+    print(f"  {'Best blend (informational)':>32}  {val_blend_m['accuracy']:>10.3f}  "
+          f"{val_blend_m['balanced_accuracy']:>10.3f}  {val_blend_m['macro_f1']:>10.3f}")
+
+    # ------------------------------------------------------------------
+    # Test (upcoming) predictions
+    # ------------------------------------------------------------------
     test_probs_list, test_keys = [], []
     test_home_pred, test_away_pred = [], []
     with torch.no_grad():
         for batch in test_loader:
             batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
-            lam_h, lam_a, outcome_logits = model(batch["x_home"], batch["x_away"], batch["x_other"])
-            probs = F.softmax(outcome_logits, dim=1)
+            lam_h, lam_a, logits = model(batch["x_home"], batch["x_away"], batch["x_other"])
+            probs = F.softmax(logits, dim=1)
             test_probs_list.append(probs.cpu().numpy())
             test_home_pred.extend(lam_h.cpu().numpy().tolist())
             test_away_pred.extend(lam_a.cpu().numpy().tolist())
@@ -912,115 +1129,105 @@ def train_model(config: LSTMConfig, device) -> TrainedModel:
     test_home_pred = np.array(test_home_pred)
     test_away_pred = np.array(test_away_pred)
 
-    train_priors = np.bincount(train_outcomes, minlength=3).astype(float)
-    train_priors /= train_priors.sum()
-    target_priors = train_priors
-    test_probs_corrected = prior_correct_probs(test_probs_raw, train_priors, target_priors)
-
-    # ---- Draw margin tuning on validation ----
-    val_home_pred, val_away_pred = [], []
-    with torch.no_grad():
-        for batch in val_loader:
-            batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
-            lam_h, lam_a, _ = model(batch["x_home"], batch["x_away"], batch["x_other"])
-            val_home_pred.extend(lam_h.cpu().numpy().tolist())
-            val_away_pred.extend(lam_a.cpu().numpy().tolist())
-    val_home_pred = np.array(val_home_pred)
-    val_away_pred = np.array(val_away_pred)
-
-    draw_margin, val_bal = tune_draw_margin(
-        val_home_pred, val_away_pred,
-        val_df["HG"].values, val_df["AG"].values,
-        config.draw_margin_grid,
-    )
-    print(f"\nBest draw margin (val): {draw_margin:.3f} (val balanced acc {val_bal:.4f})")
-
+    test_probs_corrected = prior_correct_probs(test_probs_raw, train_priors, train_priors)
     test_rate_probs = rates_to_probs(test_home_pred, test_away_pred, draw_margin)
-    test_rate_pred = np.argmax(test_rate_probs, axis=1)
-    test_clf_pred = np.argmax(test_probs_raw, axis=1)
-    test_clf_corrected_pred = np.argmax(test_probs_corrected, axis=1)
+    test_rate_pred = rate_based_predictions(test_home_pred, test_away_pred, draw_margin)
 
-    # ---- Blend weight tuning on validation ----
-    val_probs_list = []
-    with torch.no_grad():
-        for batch in val_loader:
-            batch = {k: (v.to(device) if torch.is_tensor(v) else v) for k, v in batch.items()}
-            _, _, ol = model(batch["x_home"], batch["x_away"], batch["x_other"])
-            val_probs_list.append(F.softmax(ol, dim=1).cpu().numpy())
-    val_probs_raw = np.vstack(val_probs_list)
-    val_probs_corrected = prior_correct_probs(val_probs_raw, train_priors, target_priors)
-    val_rate_probs = rates_to_probs(val_home_pred, val_away_pred, draw_margin)
+    # ---- Final decision ------------------------------------------------
+    if decision_source == "rate":
+        final_probs = test_rate_probs
+        final_pred = test_rate_pred
+    else:
+        final_probs = (best_blend["weight_clf"] * test_probs_corrected
+                       + (1 - best_blend["weight_clf"]) * test_rate_probs)
+        final_pred = np.argmax(final_probs, axis=1)
 
-    sweep_results = sweep_blend_weights(
-        val_probs_corrected, val_rate_probs, val_outcomes,
-        config.blend_sweep, objective="balanced_accuracy",
-    )
-    best = sweep_results[0]
-    best_weight = best["weight_clf"]
-    print(f"\nBest blend weight (from val): {best_weight:.2f}  "
-          f"(val balanced acc {best['balanced_accuracy']:.4f})")
+    print(f"\nFinal prediction source: {decision_source}")
 
-    test_blend_probs = best_weight * test_probs_corrected + (1 - best_weight) * test_rate_probs
-    test_blend_pred = np.argmax(test_blend_probs, axis=1)
-
-    return TrainedModel(
-        model=model,
-        config=config,
-        home_cols=home_cols,
-        away_cols=away_cols,
-        other_cols=other_cols,
-        home_prior=home_prior,
-        away_prior=away_prior,
-        draw_margin=draw_margin,
-        blend_weight=best_weight,
-        train_priors=train_priors,
-        best_epoch=best_epoch,
-        n_params=n_params,
-        val_balanced_accuracy=val_bal,
-        test_keys=test_keys,
-        test_home_pred=test_home_pred,
-        test_away_pred=test_away_pred,
-        test_blend_probs=test_blend_probs,
-        test_blend_pred=test_blend_pred,
-        test_df=test_df,
-        val_outcomes=val_outcomes,
-        sweep_results=sweep_results,
-    )
-
-
-# ============================================================================
-# ENTRY POINT
-# ============================================================================
-
-def save_model(trained: TrainedModel, path: Path = MODEL_PATH):
-    torch.save({
-        "state_dict": trained.model.state_dict(),
-        "config": trained.config.__dict__,
-        "home_cols": trained.home_cols,
-        "away_cols": trained.away_cols,
-        "other_cols": trained.other_cols,
-        "home_prior": trained.home_prior,
-        "away_prior": trained.away_prior,
-        "draw_margin": trained.draw_margin,
-        "blend_weight": trained.blend_weight,
-        "train_priors": trained.train_priors.tolist(),
-    }, path)
-
-
-def save_raw_predictions(trained: TrainedModel, path: Path = PRED_PATH):
+    # ------------------------------------------------------------------
+    # Save predictions
+    # ------------------------------------------------------------------
     pred_frame = pd.DataFrame({
-        "game_id": trained.test_keys,
-        "HG": trained.test_df["HG"].values,
-        "AG": trained.test_df["AG"].values,
-        "lambda_home": trained.test_home_pred,
-        "lambda_away": trained.test_away_pred,
-        "expected_goal_diff": trained.test_home_pred - trained.test_away_pred,
-        "prob_home": trained.test_blend_probs[:, 0],
-        "prob_draw": trained.test_blend_probs[:, 1],
-        "prob_away": trained.test_blend_probs[:, 2],
-        "predicted_result": trained.test_blend_pred,
+        "game_id": test_keys,
+        "HG": test_df["HG"].values,
+        "AG": test_df["AG"].values,
+        "lambda_home": test_home_pred,
+        "lambda_away": test_away_pred,
+        "expected_goal_diff": test_home_pred - test_away_pred,
+        "prob_home": final_probs[:, 0],
+        "prob_draw": final_probs[:, 1],
+        "prob_away": final_probs[:, 2],
+        "predicted_result": final_pred,
     })
-    pred_frame.to_csv(path, index=False)
+    pred_frame.to_csv(PRED_PATH, index=False)
+
+    # ------------------------------------------------------------------
+    # Save model
+    # ------------------------------------------------------------------
+    torch.save({
+        "state_dict": model.state_dict(),
+        "config": config.__dict__,
+        "home_cols": home_cols,
+        "away_cols": away_cols,
+        "other_cols": other_cols,
+        "home_prior": home_prior,
+        "away_prior": away_prior,
+        "draw_margin": draw_margin,
+        "blend_weight": best_blend["weight_clf"],
+        "train_priors": train_priors.tolist(),
+        "decision_source": decision_source,
+    }, MODEL_PATH)
+
+    # ------------------------------------------------------------------
+    # Report
+    # ------------------------------------------------------------------
+    print("\n" + "=" * 78)
+    print("UPCOMING FIXTURES — PREDICTION DISTRIBUTION")
+    print("=" * 78)
+    counts = np.bincount(final_pred, minlength=3)
+    total = counts.sum() if counts.sum() > 0 else 1
+    for i, name in enumerate(["HOME", "DRAW", "AWAY"]):
+        pct = 100.0 * counts[i] / total
+        print(f"  {name:>4}: {counts[i]:>4d} ({pct:>5.1f}%)")
+
+    # ------------------------------------------------------------------
+    # Summary JSON
+    # ------------------------------------------------------------------
+    summary = {
+        "run_date": pd.Timestamp.now().isoformat(timespec="seconds"),
+        "config": config.__dict__,
+        "params": {"total_trainable": n_params},
+        "feature_layout": {
+            "home_cols": len(home_cols),
+            "away_cols": len(away_cols),
+            "other_cols": len(other_cols),
+            "using_xgb_selected": config.use_xgb_selected_features,
+        },
+        "rows": {
+            "train": len(train_df),
+            "val": len(val_df),
+            "upcoming": len(test_df),
+        },
+        "priors": {"train": train_priors.tolist()},
+        "draw_disabled_in_classifier": bool(draw_disabled),
+        "decision_source": decision_source,
+        "validation": {
+            "draw_margin": draw_margin,
+            "rate_based": val_rate_m,
+            "classifier_prior_corrected": val_clf_m,
+            "best_blend_informational": val_blend_m,
+        },
+        "blend_weight_selected": best_blend["weight_clf"],
+        "blend_sweep_top5": sweep_results[:5],
+        "best_epoch": best_epoch,
+    }
+    SUMMARY_PATH.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+    print(f"\n  Saved predictions to: {PRED_PATH}")
+    print(f"  Saved model to:       {MODEL_PATH}")
+    print(f"  Saved summary to:     {SUMMARY_PATH}")
+
+    return summary
 
 
 def main():
@@ -1028,17 +1235,9 @@ def main():
     set_seed(config.seed)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
-
     WEEKLY_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    trained = train_model(config, device)
-
-    save_model(trained)
-    save_raw_predictions(trained)
-
-    print(f"\n  Saved model to:            {MODEL_PATH}")
-    print(f"  Saved raw predictions to:  {PRED_PATH}")
-    print("\nNext step: run l_prepare_shiny_data.py to build the dashboard CSVs.")
+    train_lstm(config, device)
 
 
 if __name__ == "__main__":

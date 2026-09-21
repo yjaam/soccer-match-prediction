@@ -25,5 +25,5 @@ Home_keeper_gk_save_pct,180,0,home_team,True
 Away_keeper_gk_shots_on_target_against,174,0,away_team,True
 Away_keeper_gk_goals_against,174,0,away_team,True
 Away_keeper_gk_save_pct,179,0,away_team,True
-home_xg,184,0,home_team,True
-away_xg,182,0,away_team,True
+home_xg,185,0,home_team,True
+away_xg,183,0,away_team,True

@@ -85,6 +85,114 @@ THRESHOLD_STEP = 0.05
 MIN_THRESHOLD = 0.5
 MIN_IMPROVEMENT_PERCENT = 1.0
 
+
+def _merge_with_clean_source(df_new_results, df_lineups, df_existing):
+    """
+    Build the output frame with clean team codes and all computed values.
+
+    Strategy:
+      1. Start from lineups.csv's identification columns for every game_id.
+      2. Left-join freshly-computed *_Avg_Value columns (this run).
+      3. Left-join the same *_Avg_Value columns from the previous output,
+         keyed on game_id, for rows the fresh run didn't cover.
+      4. Final: ensure a single row per game_id, sorted by date.
+
+    Identification columns (game_id, Competition, Date, Home Team, Away Team)
+    ALWAYS come from lineups.csv, never from df_existing. That's the whole
+    point: team codes must stay clean.
+    """
+    # ----- 1. Canonical identification frame (one row per game_id) --------
+    id_cols = ['game_id', 'Competition', 'Date', 'Home Team', 'Away Team']
+    id_cols = [c for c in id_cols if c in df_lineups.columns]
+
+    source = (
+        df_lineups[id_cols]
+        .drop_duplicates(subset=['game_id'])
+        .reset_index(drop=True)
+    )
+
+    # ----- 2. Discover the value-column universe --------------------------
+    # Prefer the columns from the fresh results (this run's output), then add
+    # any extra ones that appear in the existing file (e.g. if you ever add
+    # a new position group).
+    value_cols = []
+    if df_new_results is not None and not df_new_results.empty:
+        value_cols += [c for c in df_new_results.columns
+                       if c.endswith('_Avg_Value')]
+    if df_existing is not None and not df_existing.empty:
+        for c in df_existing.columns:
+            if c.endswith('_Avg_Value') and c not in value_cols:
+                value_cols.append(c)
+
+    if not value_cols:
+        # No value columns exist anywhere yet — just return the id frame.
+        return source
+
+    # ----- 3. Join fresh values -------------------------------------------
+    if df_new_results is not None and not df_new_results.empty:
+        fresh_cols = ['game_id'] + [c for c in value_cols
+                                    if c in df_new_results.columns]
+        fresh = df_new_results[fresh_cols].drop_duplicates(subset=['game_id'])
+        source = source.merge(fresh, on='game_id', how='left')
+    else:
+        # Ensure every value column exists as NaN so downstream merges work.
+        for c in value_cols:
+            if c not in source.columns:
+                source[c] = np.nan
+
+    # ----- 4. Join old values ---------------------------------------------
+    # Only bring in the *_Avg_Value columns from the old file — never the
+    # identification columns — and only where the fresh values are missing.
+    if df_existing is not None and not df_existing.empty \
+            and 'game_id' in df_existing.columns:
+
+        old_cols = ['game_id'] + [c for c in value_cols
+                                  if c in df_existing.columns]
+        if len(old_cols) > 1:  # at least one value column present
+            old = df_existing[old_cols].drop_duplicates(subset=['game_id'])
+
+            # Which rows are already covered by fresh values?
+            fresh_ids = set()
+            if df_new_results is not None and not df_new_results.empty:
+                fresh_ids = set(df_new_results['game_id'].astype(str))
+
+            # Merge old values; use suffixes so we can coalesce afterward.
+            source = source.merge(
+                old, on='game_id', how='left', suffixes=('', '_old')
+            )
+
+            # Coalesce: fresh value wins; if NaN, use old value.
+            for c in value_cols:
+                old_c = f"{c}_old"
+                if old_c in source.columns:
+                    if c in source.columns:
+                        source[c] = source[c].where(
+                            source[c].notna(), source[old_c]
+                        )
+                    else:
+                        source[c] = source[old_c]
+                    source = source.drop(columns=[old_c])
+
+    # Ensure all value columns exist, even if entirely absent from the inputs
+    for c in value_cols:
+        if c not in source.columns:
+            source[c] = np.nan
+
+    # ----- 5. Tidy up ------------------------------------------------------
+    source = source[source['game_id'].notna()].copy()
+    source = source.drop_duplicates(subset=['game_id'], keep='first')
+
+    if 'Date' in source.columns:
+        source['Date'] = pd.to_datetime(source['Date'], errors='coerce')
+        source = source.sort_values('Date').reset_index(drop=True)
+
+    # Column order: identification first, then value columns
+    front = [c for c in id_cols if c in source.columns]
+    rest = [c for c in source.columns if c not in front]
+    source = source[front + rest]
+
+    return source
+
 def calculate_similarity_matrix(lineup_names, market_names):
     """
     Calculate similarity matrix between all lineup names and market value names.
@@ -172,37 +280,47 @@ def process_lineup_values():
         else:
             raise KeyError("lineups.csv must contain game_id or Date/Home Team/Away Team columns.")
 
-    # Load previous output and keep it untouched; only process unseen game_ids.
+    # -------------------------------------------------------------------------
+    # Load previous output ONLY to know which game_ids are already done.
+    # We do NOT carry old rows forward: the codes in df_lineups are the
+    # source of truth, and carrying old rows forward is how mixed team
+    # codes (raw names + 3-letter codes) previously entered the output.
+    # -------------------------------------------------------------------------
     df_existing = None
     processed_ids = set()
     if os.path.exists(output_path):
         df_existing = pd.read_csv(output_path, low_memory=False)
-        if 'game_id' not in df_existing.columns:
-            if {'Date', 'Home Team', 'Away Team'}.issubset(df_existing.columns):
-                game_key_map = (
-                    df_lineups[['Date', 'Home Team', 'Away Team', 'game_id']]
-                    .drop_duplicates(subset=['Date', 'Home Team', 'Away Team'])
-                )
-                df_existing = df_existing.merge(
-                    game_key_map,
-                    on=['Date', 'Home Team', 'Away Team'],
-                    how='left'
-                )
-                print("Backfilled game_id in existing lineups_values.csv using Date/Home/Away.")
-            else:
-                df_existing['game_id'] = np.nan
-        processed_ids = set(df_existing['game_id'].dropna().astype(str))
+        if 'game_id' in df_existing.columns:
+            processed_ids = set(
+                df_existing['game_id'].dropna().astype(str).str.strip()
+            )
+            processed_ids.discard('')
+            processed_ids.discard('nan')
+            print(f"Loaded {len(processed_ids)} previously processed game_ids.")
+        else:
+            print("Existing lineups_values.csv has no game_id column; "
+                  "treating all rows as unprocessed.")
 
-    df_pending = df_lineups[~df_lineups['game_id'].astype(str).isin(processed_ids)].copy()
+    df_pending = df_lineups[
+        ~df_lineups['game_id'].astype(str).str.strip().isin(processed_ids)
+    ].copy()
+
     print(f"Existing processed games: {len(processed_ids)}")
     print(f"Pending games for market value lookup: {len(df_pending)}")
 
     if df_pending.empty:
-        if df_existing is not None:
-            df_existing.to_csv(output_path, index=False, encoding='utf-8-sig')
-            print("No pending games. Kept existing lineups_values.csv (with game_id column).")
-        else:
-            print("No pending games and no existing output. Nothing to process.")
+        # Even if nothing is pending, rebuild the output from the clean source
+        # so any previously-corrupted rows get fixed in place.
+        print("No pending games. Rebuilding lineups_values.csv from clean source...")
+        df_rebuilt = _merge_with_clean_source(
+            pd.DataFrame(columns=['game_id']),
+            df_lineups,
+            df_existing
+        )
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        df_rebuilt.to_csv(output_path, index=False, encoding='utf-8-sig')
+        print(f"Total games in output: {len(df_rebuilt)}")
+        print(f"Saved summary to: {output_path}")
         return
 
     # Verify that all hardcoded columns exist in the dataframe
@@ -292,15 +410,9 @@ def process_lineup_values():
             results.append(match_summary)
 
         df_results_new = pd.DataFrame(results)
-        if df_existing is not None:
-            df_results = pd.concat([df_existing, df_results_new], ignore_index=True)
-        else:
-            df_results = df_results_new
-
-        if 'game_id' in df_results.columns:
-            df_results = df_results.drop_duplicates(subset=['game_id'], keep='first')
-        if 'Date' in df_results.columns:
-            df_results = df_results.sort_values('Date').reset_index(drop=True)
+        df_results = _merge_with_clean_source(
+            df_results_new, df_lineups, df_existing
+        )
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         df_results.to_csv(output_path, index=False, encoding='utf-8-sig')
@@ -475,22 +587,16 @@ def process_lineup_values():
         
         results.append(match_summary)
     
-    # Save results (append only new game_ids)
+    # Save results — rebuild from the clean lineups.csv source so team codes
+    # always come from the current pipeline, never from stale rows.
     df_results_new = pd.DataFrame(results)
-    if df_existing is not None:
-        df_results = pd.concat([df_existing, df_results_new], ignore_index=True)
-    else:
-        df_results = df_results_new
-
-    if 'game_id' in df_results.columns:
-        df_results = df_results.drop_duplicates(subset=['game_id'], keep='first')
-
-    if 'Date' in df_results.columns:
-        df_results = df_results.sort_values('Date').reset_index(drop=True)
+    df_results = _merge_with_clean_source(
+        df_results_new, df_lineups, df_existing
+    )
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     df_results.to_csv(output_path, index=False, encoding='utf-8-sig')
-    
+
     print("\n--- Processing Complete ---")
     print(f"New games processed: {len(df_results_new)}")
     print(f"Total games in output: {len(df_results)}")

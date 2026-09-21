@@ -41,7 +41,7 @@ soccer_teams = {
     'Verein für Bewegungsspiele Stuttgart 1893': 'VFB',
     '1. Fußball-Club Köln': 'KOE',
     'Sunderland Association Football Club': 'SUN',
-    'Futbol Club Barcelona': 'FCB',
+    'Futbol Club Barcelona': 'BAR',
     'Chelsea Football Club': 'CHE',
     'Manchester United Football Club': 'MUN',
     'Deportivo de La Coruña': 'DEP',
@@ -63,7 +63,7 @@ soccer_teams = {
     'Borussia Dortmund': 'BVB',
     'Bayer 04 Leverkusen Fußball': 'B04',
     'Turn- und Sportgemeinschaft 1899 Hoffenheim Fußball-Spielbetriebs': 'TSG',
-    'FC Bayern München': 'FCB',
+    'FC Bayern München': 'BAY',
     'Udinese Calcio': 'UDI',
     'Associazione Calcio Fiorentina': 'FIO',
     'FC Empoli': 'EMP',
@@ -165,7 +165,7 @@ soccer_teams = {
     'Calcio Como': 'COM',
     'Fußball-Club St. Pauli von 1910': 'STP',
     'Holstein Kiel': 'KSV',
-    'Turn- und Sportverein Egger Glas Hartberg': 'TSV',
+    'Turn- und Sportverein Egger Glas Hartberg': 'HTB',
     'Fußballclub Red Bull Salzburg': 'RBS',
     'Fußballclub Blau-Weiß Linz': 'BWL',
     'Real Oviedo S.A.D.': 'OVI',
@@ -210,7 +210,7 @@ soccer_teams = {
     "Nott'm Forest": 'NFO',
     'Luton': 'LUT',
     'Ipswich': 'IPS',
-    'Bayern Munich': 'FCB',
+    'Bayern Munich': 'BAY',
     'Dortmund': 'BVB',
     'Ein Frankfurt': 'SGE',
     'FC Koln': 'KOE',
@@ -280,7 +280,7 @@ soccer_teams = {
     'Granada': 'GCF',
     'Malaga': 'MAL',
     'Sevilla': 'SEV',
-    'Barcelona': 'FCB',
+    'Barcelona': 'BAR',
     'Celta': 'CEL',
     'Eibar': 'EIB',
     'Levante': 'LEV',
@@ -478,6 +478,78 @@ soccer_teams = {
     'Coventry City': 'COV',
     'Tottenham Hotspur': 'TOT',
     'Inter Milan': 'INT',
+
+    # ============================================================================
+    # FIFTH LIST - Names from Transfermarkt lineups / historical matches
+    # (added after the unmapped-teams diagnostic, 2026-09)
+    # ============================================================================
+
+    # --- England ---------------------------------------------------------------
+    'West Ham United': 'WHU',
+    'Sunderland AFC': 'SUN',
+
+    # --- Italy ----------------------------------------------------------------
+    'Atalanta BC': 'ATA',
+    'SSC Napoli': 'NAP',
+    'ACF Fiorentina': 'FIO',
+    'Genoa CFC': 'GEN',
+    'US Sassuolo': 'SAS',
+    'US Lecce': 'LEC',
+    'US Cremonese': 'CRE',
+    'Como 1907': 'COM',
+    'US Livorno 1915': 'LVR',
+    'Catania FC': 'CAT',
+
+    # --- Germany ---------------------------------------------------------------
+    'Borussia Mönchengladbach': 'BMG',
+    '1.FSV Mainz 05': 'M05',
+    'TSG 1899 Hoffenheim': 'TSG',
+    'Bayer 04 Leverkusen': 'B04',
+    'VfL Wolfsburg': 'WOB',
+    'SV Werder Bremen': 'SVW',
+    '1.FC Köln': 'KOE',
+    '1.FC Nuremberg': 'FCN',
+    '1.FC Union Berlin': 'UNB',
+    'Eintracht Braunschweig': 'EBS',
+
+    # --- Spain ----------------------------------------------------------------
+    'Celta de Vigo': 'CEL',
+    'Atlético de Madrid': 'ATM',
+    'Athletic Bilbao': 'ATH',
+    'Real Betis Balompié': 'BET',
+    'RCD Espanyol Barcelona': 'ESP',
+    'Levante UD': 'LEV',
+    'CA Osasuna': 'OSA',
+    'Deportivo Alavés': 'ALA',
+    'RCD Mallorca': 'MLL',
+
+    # --- France ---------------------------------------------------------------
+    'Olympique Marseille': 'OM',
+    'OGC Nice': 'NIC',
+    'Stade Rennais FC': 'REN',
+    'LOSC Lille': 'LOS',
+    'Olympique Lyon': 'OL',
+    'Angers SCO': 'ANG',
+    'RC Strasbourg Alsace': 'RCS',
+    'RC Lens': 'RCL',
+    'Le Havre AC': 'HAC',
+    'FC Sochaux-Montbéliard': 'SOC',
+    'Valenciennes FC': 'VLC',
+
+    # --- Austria (rare, defensive) -------------------------------------------
+    'Sportklub Puntigamer Sturm Graz': 'STU',
+    'Austria Vienna': 'AUV',
+    'TSV Hartberg': 'HTB',
+    'Rapid Vienna': 'RAP',
+    'FC Blau-Weiss Linz': 'BWL',
+    'LASK': 'LSC',
+    'Wolfsberger AC': 'WAC',
+    'Sportclub Rheindorf Altinach': 'ALT',
+    'Sportclub Rheindorf Altach': 'ALT',
+    'Grazer AK 1902': 'GAK',
+    'WSG Tirol': 'WSG',
+    'SV Ried': 'RIE',
+    'SK Austria Klagenfurt': 'AUK',
 }
 
 
@@ -508,25 +580,25 @@ def resolve_team_name_fuzzy(name):
     """
     if pd.isna(name):
         return None
-    
+
     name_str = str(name).strip()
 
     # Fast-path for already standardized team codes.
     code_upper = name_str.upper()
     if code_upper in soccer_teams.values():
         return code_upper
-    
+
     # 1. Direct lookup
     result = soccer_teams.get(name_str)
     if result:
         return result
-    
+
     # 2. Case-insensitive lookup
     name_lower = name_str.lower()
     for key, value in soccer_teams.items():
         if key.lower() == name_lower:
             return value
-    
+
     # 3. Try removing common suffixes
     for suffix in [' FC', ' CF', ' SC', ' S.A.D.', ' S. A. D.', ' Football Club']:
         if name_str.endswith(suffix):
@@ -534,7 +606,7 @@ def resolve_team_name_fuzzy(name):
             result = soccer_teams.get(shortened)
             if result:
                 return result
-    
+
     # 4. Try removing common prefixes
     for prefix in ['FC ', 'AC ', 'AS ', 'SD ', 'CD ', 'SC ', 'UD ', '1. ']:
         if name_str.startswith(prefix):
@@ -542,7 +614,7 @@ def resolve_team_name_fuzzy(name):
             result = soccer_teams.get(shortened)
             if result:
                 return result
-    
+
     return None
 
 
@@ -553,18 +625,18 @@ def get_full_name_from_code(code):
     """
     if pd.isna(code):
         return None
-    
+
     code_str = str(code).strip().upper()
-    
+
     # Find all full names that map to this code
     matching_names = []
     for full_name, team_code in soccer_teams.items():
         if team_code.upper() == code_str:
             matching_names.append(full_name)
-    
+
     if matching_names:
         # Prefer names from the xG list (third list) as they're most common
         # Then prefer shorter names
         return min(matching_names, key=len)
-    
+
     return None

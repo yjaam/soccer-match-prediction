@@ -1,0 +1,116 @@
+# team_mapping.R
+#
+# Canonical team-name → 3-letter code mapping, ported from
+# src/team_name_mapping_FINAL.py so both the Python pipeline and the Shiny
+# dashboard agree on team identity (used for logo lookup in app.R).
+#
+# Keep this file in sync with src/team_name_mapping_FINAL.py when you add
+# new name variants there.
+
+TEAM_MAP <- c(
+  # ---- Premier League / common short names ---------------------------------
+  'Arsenal'='ARS','Leicester'='LEI','Man United'='MUN','QPR'='QPR','Stoke'='STK',
+  'West Brom'='WBA','West Ham'='WHU','Liverpool'='LIV','Newcastle'='NEW',
+  'Burnley'='BUR','Aston Villa'='AVL','Chelsea'='CHE','Crystal Palace'='CRY',
+  'Everton'='EVE','Southampton'='SOU','Swansea'='SWA','Hull'='HUL','Sunderland'='SUN',
+  'Tottenham'='TOT','Man City'='MCI','Bournemouth'='BOU','Norwich'='NOR',
+  'Watford'='WAT','Middlesbrough'='MID','Brighton'='BHA','Huddersfield'='HUD',
+  'Fulham'='FUL','Wolves'='WOL','Cardiff'='CAR','Sheffield United'='SHU',
+  'Leeds'='LEE','Brentford'='BRE',"Nott'm Forest"='NFO','Luton'='LUT','Ipswich'='IPS',
+  # ---- Full official names -------------------------------------------------
+  'Arsenal Football Club'='ARS','Liverpool Football Club'='LIV',
+  'Chelsea Football Club'='CHE','Manchester United Football Club'='MUN',
+  'Manchester City Football Club'='MCI','Tottenham Hotspur Football Club'='TOT',
+  'Everton Football Club'='EVE','Newcastle United Football Club'='NEW',
+  'Aston Villa Football Club'='AVL','Crystal Palace Football Club'='CRY',
+  'Sunderland Association Football Club'='SUN','Fulham Football Club'='FUL',
+  'Brentford Football Club'='BRE','Nottingham Forest Football Club'='NFO',
+  'Leeds United Association Football Club'='LEE','AFC Bournemouth'='BOU',
+  'Association Football Club Bournemouth'='BOU','Brighton & Hove Albion'='BHA',
+  'Brighton and Hove Albion Football Club'='BHA','Coventry City'='COV',
+  'Tottenham Hotspur'='TOT',
+  # ---- Bundesliga ---------------------------------------------------------
+  'Bayern Munich'='BAY','Dortmund'='BVB',
+  'Ein Frankfurt'='SGE','FC Koln'='KOE','Hannover'='H96','Hertha'='BSC',
+  'Hoffenheim'='TSG',"M'gladbach"='BMG','Paderborn'='SCP','Augsburg'='FCA',
+  'Hamburg'='HSV','Leverkusen'='B04','Schalke 04'='S04','Stuttgart'='VFB',
+  'Werder Bremen'='SVW','Wolfsburg'='WOB','Freiburg'='SCF','Mainz'='M05',
+  'Darmstadt'='D98','Ingolstadt'='ING','RB Leipzig'='RBL',
+  'Fortuna Dusseldorf'='F95','Nurnberg'='FCN','Union Berlin'='UNB',
+  'Bielefeld'='DSC','Bochum'='BOC','Greuther Furth'='SGF','Heidenheim'='HDH',
+  'St Pauli'='STP','Holstein Kiel'='KSV','1. FC Köln'='KOE',
+  '1899 Hoffenheim'='TSG','FSV Mainz 05'='M05','Mönchengladbach'='BMG',
+  'SV 07 Elversberg'='ELV','Bayer Leverkusen'='B04','Eintracht Frankfurt'='SGE',
+  'FC Schalke 04'='S04','VfB Stuttgart'='VFB','1. FC Union Berlin'='UNB',
+  '1. Fußballclub Union Berlin'='UNB','SC Paderborn 07'='SCP',
+  '1. Fußballclub Heidenheim 1846'='HDH','1. Fußball- und Sportverein Mainz 05'='M05',
+  # ---- Serie A ------------------------------------------------------------
+  'Roma'='ROM','Atalanta'='ATA','Cesena'='CES','Genoa'='GEN','Milan'='ACM',
+  'Palermo'='PAL','Sassuolo'='SAS','Torino'='TOR','Udinese'='UDI','Empoli'='EMP',
+  'Juventus'='JUV','Cagliari'='CAG','Fiorentina'='FIO','Inter'='INT','Lazio'='LAZ',
+  'Napoli'='NAP','Parma'='PAR','Sampdoria'='SAM','Verona'='VER','Frosinone'='FRO',
+  'Bologna'='BOL','Carpi'='CAR','Pescara'='PES','Crotone'='CRO','Benevento'='BEN',
+  'Spal'='SPA','Lecce'='LEC','Brescia'='BRE','Spezia'='SPE','Salernitana'='SAL',
+  'Venezia'='VEN','Monza'='MON','Cremonese'='CRE','Como'='COM','Pisa'='PIS',
+  'AC Milan'='ACM','Inter Milan'='INT','Juventus FC'='JUV',
+  'ACF Fiorentina'='FIO','Atalanta BC'='ATA','Bologna FC 1909'='BOL',
+  'Cagliari Calcio'='CAG','Genoa CFC'='GEN','SS Lazio'='LAZ',
+  'SSC Napoli'='NAP','Torino FC'='TOR','Udinese Calcio'='UDI','US Lecce'='LEC',
+  'US Sassuolo'='SAS','Venezia FC'='VEN','AC Monza'='MON','Parma Calcio 1913'='PAR',
+  'AS Roma'='ROM',
+  # ---- La Liga ------------------------------------------------------------
+  'Almeria'='ALM','Granada'='GCF','Malaga'='MAL','Sevilla'='SEV','Barcelona'='BAR',
+  'Celta'='CEL','Eibar'='EIB','Levante'='LEV','Real Madrid'='RMA',
+  'Vallecano'='RAY','Getafe'='GET','Valencia'='VAL','Ath Bilbao'='ATH',
+  'Ath Madrid'='ATM','Cordoba'='COR','Espanol'='ESP','Elche'='ELC',
+  'La Coruna'='DEP','Sociedad'='RSO','Villarreal'='VIL','Betis'='BET',
+  'Sp Gijon'='GIJ','Las Palmas'='LPA','Leganes'='LEG','Osasuna'='OSA',
+  'Alaves'='ALA','Girona'='GIR','Valladolid'='VLD','Huesca'='HUE',
+  'Mallorca'='MLL','Cadiz'='CAD','Oviedo'='OVI','Atletico Madrid'='ATM',
+  'Atlético Madrid'='ATM','Athletic Club'='ATH','Athletic Club Bilbao'='ATH',
+  'Real Betis Balompié'='BET','Real Madrid Club de Fútbol'='RMA',
+  'Real Sociedad'='RSO','Sevilla FC'='SEV','Valencia CF'='VAL',
+  'Villarreal CF'='VIL','Rayo Vallecano'='RAY','Celta de Vigo'='CEL',
+  'CA Osasuna'='OSA','Getafe CF'='GET','Elche CF'='ELC','RCD Espanyol Barcelona'='ESP',
+  'FC Barcelona'='BAR','Club Atlético de Madrid'='ATM','Club Atlético Osasuna'='OSA',
+  'Deportivo Alavés'='ALA','Deportivo'='DEP','Real Betis'='BET',
+  # ---- Ligue 1 ------------------------------------------------------------
+  'Reims'='REI','Bastia'='BAS','Evian Thonon Gaillard'='EVI','Guingamp'='GUI',
+  'Lille'='LOS','Montpellier'='MHSC','Nantes'='NAN','Nice'='NIC','Lyon'='OL',
+  'Monaco'='ASM','Caen'='CAE','Lens'='RCL','Lorient'='LOR','Metz'='MET',
+  'Paris SG'='PSG','Rennes'='REN','Toulouse'='TFC','Bordeaux'='BOR',
+  'Marseille'='OM','St Etienne'='STE','Troyes'='TRO','Angers'='ANG',
+  'Ajaccio GFCO'='GFCA','Dijon'='DIJ','Nancy'='NAN','Amiens'='AMI',
+  'Strasbourg'='RCS','Nimes'='NIM','Brest'='SB29','Clermont'='CLE',
+  'Ajaccio'='ACA','Auxerre'='AJA','Le Havre'='HAC','Paris FC'='PFC',
+  'Olympique Lyonnais'='OL','Olympique de Marseille'='OM','Olympique Marseille'='OM',
+  'Paris Saint-Germain'='PSG','Paris Saint-Germain Football Club'='PSG',
+  'AS Monaco'='ASM','LOSC Lille'='LOS','RC Lens'='RCL','OGC Nice'='NIC',
+  'Stade Rennais FC'='REN','FC Lorient'='LOR','FC Toulouse'='TFC',
+  'Le Havre AC'='HAC','Le Mans'='LEM','ESTAC Troyes'='TRO','AJ Auxerre'='AJA',
+  'RC Strasbourg Alsace'='RCS','Stade Brestois 29'='SB29','Angers SCO'='ANG',
+  # ---- Extra variants seen in xG / lineup feeds ---------------------------
+  'PSG'='PSG','Manchester Utd'='MUN','Nottingham'='NFO','Frankfurt'='SGE',
+  'Gladbach'='BMG','Hertha BSC'='BSC','Arminia'='DSC','Greuther Fürth'='SGF',
+  'Darmstadt 98'='D98','Paderborn 07'='SCP','Köln'='KOE','Düsseldorf'='F95',
+  'Nürnberg'='FCN','Hellas Verona'='VER','Nîmes'='NIM','Saint-Étienne'='STE',
+  'Evian'='EVI','Gazélec Ajaccio'='GFCA','Alavés'='ALA','Almería'='ALM',
+  'Málaga'='MAL','Cádiz'='CAD','Córdoba'='COR','Leganés'='LEG',
+  'Dep. La Coruña'='DEP','Elversberg'='ELV','Karlsruher'='KSC','BTSV'='BTS',
+  'Racing Santander'='RSA','Le Mans FC'='LEM','Málaga CF'='MAL','Cádiz CF'='CAD',
+  'Granada CF'='GCF','Real Valladolid CF'='VLD','CD Leganés'='LEG',
+  'Racing Club de Strasbourg Alsace'='RCS','Lille Olympique Sporting Club'='LOS',
+  'Racing Club de Lens'='RCL','Stade Rennais Football Club'='REN',
+  'Toulouse Football Club'='TFC','Football Club de Nantes'='NAN',
+  'Football Club de Metz'='MET','Football Club Lorient-Bretagne Sud'='LOR',
+  'FC Girondins Bordeaux'='BOR','Montpellier HSC'='MHSC','EA Guingamp'='GUI',
+  'SC Bastia'='BAS','SM Caen'='CAE','Stade Reims'='REI',
+  'Association sportive de Monaco Football Club'='ASM',
+  'AS Saint-Étienne'='STE','Dijon FCO'='DIJ','Amiens SC'='AMI',
+  'Nîmes Olympique'='NIM','Clermont Foot 63'='CLE','Association de la Jeunesse auxerroise'='AJA',
+  'AC Ajaccio'='ACA','Stade brestois 29'='SB29','Le Havre Athletic Club'='HAC',
+  'Paris Football Club'='PFC'
+)
+
+# Convenience: all known 3-letter codes, used for the "already a code?" fast path.
+ALL_TEAM_CODES <- unique(unname(TEAM_MAP))

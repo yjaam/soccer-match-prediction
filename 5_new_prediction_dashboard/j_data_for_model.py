@@ -13,14 +13,17 @@ Difference from training-time script:
   dashboard's ./prediction_data/upcoming_*.csv files.
 - Standardization statistics are fit on the full historical data.
 
+Goals are read from data/big5_matches_fixed.csv (the legacy
+target_variables.csv has been removed).
+
 Outputs (all inside the dashboard folder):
-- nn_input_data/nn_input_lineup_TRAIN.csv,   nn_input_data/nn_input_lineup_TEST.csv
+- nn_input_data/nn_input_lineup_TRAIN.csv,     nn_input_data/nn_input_lineup_TEST.csv
 - nn_input_data/nn_input_player_stats_TRAIN.csv, nn_input_data/nn_input_player_stats_TEST.csv
 - nn_input_data/nn_input_skill_matchups_TRAIN.csv, nn_input_data/nn_input_skill_matchups_TEST.csv
 - nn_input_data/nn_input_match_stats_TRAIN.csv, nn_input_data/nn_input_match_stats_TEST.csv
-- nn_input_data/nn_input_league_TRAIN.csv,   nn_input_data/nn_input_league_TEST.csv
-- nn_input_data/nn_input_season_TRAIN.csv,   nn_input_data/nn_input_season_TEST.csv
-- nn_input_data/nn_input_matchup_TRAIN.csv,  nn_input_data/nn_input_matchup_TEST.csv
+- nn_input_data/nn_input_league_TRAIN.csv,     nn_input_data/nn_input_league_TEST.csv
+- nn_input_data/nn_input_season_TRAIN.csv,     nn_input_data/nn_input_season_TEST.csv
+- nn_input_data/nn_input_matchup_TRAIN.csv,    nn_input_data/nn_input_matchup_TEST.csv
 - nn_input_data/nn_module_metadata.json
 """
 
@@ -39,7 +42,9 @@ PROJECT_DIR = SCRIPT_DIR.parent                              # project root
 # Historical artifacts (read-only, produced by the training pipeline)
 TRAINING_FINAL_DATA_DIR = PROJECT_DIR / "final_data"
 TRAINING_DATA_DIR = PROJECT_DIR / "data"
-TRAINING_TARGET_PATH = TRAINING_DATA_DIR / "target_variables.csv"
+
+# Goals source — big5_matches_fixed.csv replaces the removed target_variables.csv
+TRAINING_GOALS_SOURCE_PATH = TRAINING_DATA_DIR / "big5_matches_fixed.csv"
 
 # Dashboard-local outputs
 NN_INPUT_DATA_DIR = SCRIPT_DIR / "nn_input_data"
@@ -51,12 +56,6 @@ PREDICTION_DATA_DIR = SCRIPT_DIR / "prediction_data"
 
 # ============================================================================
 # MODULE SPECS
-#
-# Each module spec declares:
-#   - historical train / test files (from the training-time pipeline)
-#   - upcoming file (from the dashboard)
-#   - key column name
-#   - optional label source
 # ============================================================================
 
 MODULE_SPECS = {
@@ -65,7 +64,7 @@ MODULE_SPECS = {
         "test": TRAINING_FINAL_DATA_DIR / "lineup_embeddings_TEST.csv",
         "upcoming": PREDICTION_DATA_DIR / "upcoming_lineup_embeddings.csv",
         "key": "game_id",
-        "label_source": TRAINING_TARGET_PATH,
+        "label_source": TRAINING_GOALS_SOURCE_PATH,
         "label_key": "game_id",
     },
     "player_stats": {
@@ -136,7 +135,13 @@ def _load_optional(path: Path) -> pd.DataFrame | None:
 
 
 def _add_labels_if_needed(df: pd.DataFrame, spec: dict) -> pd.DataFrame:
-    """Ensure HG / AG labels are present. Pulls from label_source if needed."""
+    """
+    Ensure HG / AG labels are present. Pulls from label_source if needed.
+
+    Auto-detects the home/away goal columns in the source file so it works
+    with big5_matches_fixed.csv (Home_goals / Away_goals) as well as any
+    legacy file that used HG / AG.
+    """
     label_source = spec.get("label_source")
     label_key = spec.get("label_key")
     key_col = spec["key"]
@@ -145,17 +150,31 @@ def _add_labels_if_needed(df: pd.DataFrame, spec: dict) -> pd.DataFrame:
         return df
 
     labels = _load_frame(label_source)
-    required = {label_key, "HG", "AG"}
-    if not required.issubset(labels.columns):
-        raise KeyError(f"Label source {label_source} missing required columns: {required}")
+
+    home_candidates = ["HG", "FTHG", "Home_goals", "home_goals"]
+    away_candidates = ["AG", "FTAG", "Away_goals", "away_goals"]
+
+    hg_col = next((c for c in home_candidates if c in labels.columns), None)
+    ag_col = next((c for c in away_candidates if c in labels.columns), None)
+
+    if label_key not in labels.columns or hg_col is None or ag_col is None:
+        raise KeyError(
+            f"Label source {label_source} missing required columns. "
+            f"Need '{label_key}' + a home-goal column and an away-goal column. "
+            f"Available columns: {list(labels.columns)}"
+        )
+
+    labels_norm = (
+        labels[[label_key, hg_col, ag_col]]
+        .rename(columns={hg_col: "HG", ag_col: "AG"})
+    )
 
     out = df.copy()
     for col in ["HG", "AG"]:
         if col in out.columns:
             out = out.drop(columns=[col])
 
-    out = out.merge(labels[[label_key, "HG", "AG"]],
-                    left_on=key_col, right_on=label_key, how="left")
+    out = out.merge(labels_norm, left_on=key_col, right_on=label_key, how="left")
     if label_key != key_col and label_key in out.columns:
         out = out.drop(columns=[label_key])
 
@@ -185,13 +204,12 @@ def _clean_module(
     Clean both TRAIN and TEST frames, then standardize.
 
     train_df:   full historical data (all seasons up to and including 2025-2026)
-    test_df:    upcoming fixtures (no HG/AG labels expected — they'll be filled with NaN)
+    test_df:    upcoming fixtures (no HG/AG labels expected — filled with NaN)
     """
     required = {key_col}
     if not required.issubset(train_df.columns):
         raise KeyError(f"{module_name} TRAIN missing required columns: {sorted(required - set(train_df.columns))}")
 
-    # Make sure the test frame has the key column
     if key_col not in test_df.columns:
         raise KeyError(f"{module_name} TEST missing required key column '{key_col}'.")
 
@@ -218,10 +236,8 @@ def _clean_module(
     # Upcoming: no label filtering — just require a valid key
     test = test.dropna(subset=[key_col]).copy()
 
-    # Determine feature columns from the intersection of numeric columns
     feature_candidates = [c for c in train.columns if c not in {key_col, "HG", "AG"}]
 
-    # Drop obvious identifier columns
     id_like_cols = {
         c for c in feature_candidates
         if c == "match_id" or c.endswith("_id") or c.endswith("Id") or c.endswith("ID")
@@ -235,25 +251,28 @@ def _clean_module(
             test[col] = pd.to_numeric(test[col], errors="coerce")
         else:
             test[col] = np.nan
-        # Keep the feature only if it's populated in at least one training row
         if train[col].notna().sum() > 0:
             feature_cols.append(col)
 
     if not feature_cols:
-        raise ValueError(f"No usable numeric features found for module '{module_name}'.")
+        raise ValueError(
+            f"No usable numeric features found for module '{module_name}'.\n"
+            f"    Historical shape (post-cleaning): {train.shape}\n"
+            f"    Historical rows kept after label drop: {len(train)}\n"
+            f"    Historical columns (first 15): {list(train.columns)[:15]}\n"
+            f"    Hint: if rows kept = 0, the module's HG/AG labels could not "
+            f"be resolved — check label_source and game_id format."
+        )
 
-    # Median imputation from training
     medians = train[feature_cols].median(numeric_only=True)
     train[feature_cols] = train[feature_cols].fillna(medians)
     test[feature_cols] = test[feature_cols].fillna(medians)
 
-    # Replace infinities
     train[feature_cols] = train[feature_cols].replace([np.inf, -np.inf], np.nan)
     test[feature_cols] = test[feature_cols].replace([np.inf, -np.inf], np.nan)
     train[feature_cols] = train[feature_cols].fillna(medians)
     test[feature_cols] = test[feature_cols].fillna(medians)
 
-    # Standardize
     if fit_standardization_on_train_only:
         feature_means = train[feature_cols].mean(numeric_only=True)
         feature_stds = train[feature_cols].std(numeric_only=True).replace(0, 1.0).fillna(1.0)
@@ -265,7 +284,6 @@ def _clean_module(
     train[feature_cols] = (train[feature_cols] - feature_means) / feature_stds
     test[feature_cols] = (test[feature_cols] - feature_means) / feature_stds
 
-    # Reorder and subset columns
     train = train[[key_col, "HG", "AG"] + feature_cols].copy()
     test = test[[key_col, "HG", "AG"] + feature_cols].copy()
 
@@ -295,6 +313,7 @@ def main() -> None:
     print("PREPARING DASHBOARD NN INPUTS")
     print("=" * 78)
     print(f"Historical reference: {TRAINING_FINAL_DATA_DIR}")
+    print(f"Goals source:         {TRAINING_GOALS_SOURCE_PATH}")
     print(f"Upcoming inputs:      {PREDICTION_DATA_DIR}")
     print(f"Output directory:     {NN_INPUT_DATA_DIR}")
     print()
@@ -304,7 +323,6 @@ def main() -> None:
     for module_name, spec in MODULE_SPECS.items():
         print(f"\n[{module_name}]")
 
-        # --- Historical side: concatenate original TRAIN + TEST (all history) ---
         try:
             hist_train = _load_frame(spec["train"])
         except FileNotFoundError as e:
@@ -321,23 +339,18 @@ def main() -> None:
             hist_full = hist_train
             print(f"  Historical rows: {len(hist_train)} (TRAIN only)")
 
-        # Attach labels if needed
         hist_full = _add_labels_if_needed(hist_full, spec)
 
-        # --- Upcoming side: dashboard-local file ---
         upcoming = _load_optional(spec["upcoming"])
         if upcoming is None:
             print(f"  ⚠ Upcoming file not found: {spec['upcoming']} — skipping module.")
             continue
         print(f"  Upcoming rows:   {len(upcoming)}")
 
-        # Upcoming frames don't have HG/AG — that's fine, they'll be NaN.
-        # But we do want the same key column.
         if spec["key"] not in upcoming.columns:
             print(f"  ⚠ Upcoming file missing key column '{spec['key']}' — skipping module.")
             continue
 
-        # --- Clean + standardize ---
         try:
             train_clean, test_clean, feature_cols, stats = _clean_module(
                 module_name=module_name,
