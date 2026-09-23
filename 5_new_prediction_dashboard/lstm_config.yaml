@@ -1,0 +1,80 @@
+modules:
+  - lineup
+  - player_stats
+  - skill_matchups
+  - match_stats
+  - league
+  - season
+  - matchup
+
+feature_selection:
+  use_xgb_selected_features: true
+  selected_features_path: "../misc/xgboost_selected_features.json"
+
+architecture:
+  hidden_dim: 128
+  num_lstm_layers: 2
+  rate_head_hidden: 48
+  outcome_head_hidden: 64
+  dropout: 0.15
+  input_dropout: 0.05
+  rate_head_bounds: [0.05, 5.0]
+
+training:
+  val_fraction: 0.12
+  epochs: 150
+  batch_size: 96
+  learning_rate: 1.5e-3
+  weight_decay: 1e-5
+  early_stopping_patience: 25
+  lr_patience: 10
+  lr_factor: 0.5
+  min_lr: 1e-6
+  grad_clip_max_norm: 5.0
+  seed: 42
+
+loss:
+  outcome_weight: 3.0
+  use_full_class_weights: true
+  class_weight_scales:
+    home: 1.30
+    draw: 0.15
+    away: 1.30
+  spread_weight: 1.5
+  target_std: 1.2
+
+decision:
+  source: classifier
+  draw_margin_grid:
+    start: 0.0
+    stop: 2.5
+    num: 251
+  blend_sweep:
+    start: 0.5
+    stop: 1.0
+    num: 11
+  sweep_objective: balanced_accuracy
+
+paths:
+  nn_input_dir: nn_input_data
+  weekly_results_dir: weekly_results
+  module_metadata_path: nn_input_data/nn_module_metadata.json
+
+leak_prevention:
+  goal_suffix_regex: "^(hg|ag)_"
+  match_stat_regex: "^(Home|Away)_"
+  leaky_tokens:
+    - actual
+    - home_goals
+    - away_goals
+    - fthg
+    - ftag
+    - home_score
+    - away_score
+    - outcome
+    - result
+
+runtime:
+  device: auto
+  verbose_features: false
+  preview_predictions_rows: 0

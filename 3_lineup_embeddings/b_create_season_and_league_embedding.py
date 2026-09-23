@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Train league, season, AND matchup embeddings and export module-ready files.
+"""Train league, season, and team attack/defence embeddings.
 
-Three context types are learned:
-1. League embedding (5 leagues)
-2. Season embedding (12 seasons)
-3. Matchup embedding (home_team__away_team pairs)
+Replaces the previous matchup-embedding approach (which exploded
+combinatorially in the number of team pairs) with a Dixon-Coles-style
+parameterization:
 
-This captures rivalry effects, head-to-head patterns, and style matchups.
+    log(lambda_home) = mu_home + head_home( home_off, league_emb, season_emb )
+    log(lambda_away) = mu_away + head_away( away_off, league_emb, season_emb )
 
-NOTE: Match results (goals) are read directly from data/big5_matches_fixed.csv.
-      The legacy data/target_variables.csv file is no longer required.
+where
+    home_off = attack(home_team) - defence(away_team)
+    away_off = attack(away_team) - defence(home_team)
+
+This reduces the number of learned matchup-specific parameters from
+O(n_teams^2) to O(n_teams), which is the difference between an
+unlearnable model and one that can extract real signal from ~20k matches.
+
+Outputs (same file names as before):
+    league_embeddings_{TRAIN,TEST}.csv    (league_emb_1..K)
+    season_embeddings_{TRAIN,TEST}.csv    (season_emb_1..K)
+    matchup_embeddings_{TRAIN,TEST}.csv   (matchup_emb_1..4K, team embeddings)
+Each file also carries game_id, HG, AG.
 """
 
 from __future__ import annotations
@@ -29,7 +40,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
 if str(PROJECT_DIR) not in sys.path:
@@ -44,7 +54,6 @@ RESULT_DATA_DIR = PROJECT_DIR / "result_data"
 
 TRAIN_SPLIT_SOURCE = FINAL_DATA_DIR / "lineup_embeddings_TRAIN.csv"
 TEST_SPLIT_SOURCE = FINAL_DATA_DIR / "lineup_embeddings_TEST.csv"
-# Goals source — replaces the removed target_variables.csv
 GOALS_SOURCE_PATH = DATA_DIR / "big5_matches_fixed.csv"
 
 LEAGUE_TRAIN_OUTPUT_PATH = FINAL_DATA_DIR / "league_embeddings_TRAIN.csv"
@@ -55,145 +64,32 @@ MATCHUP_TRAIN_OUTPUT_PATH = FINAL_DATA_DIR / "matchup_embeddings_TRAIN.csv"
 MATCHUP_TEST_OUTPUT_PATH = FINAL_DATA_DIR / "matchup_embeddings_TEST.csv"
 
 META_OUTPUT_PATH = MISC_DIR / "context_embedding_metadata.json"
-LEAGUE_MODEL_OUTPUT_PATH = RESULT_DATA_DIR / "league_embedding_model.pt"
-SEASON_MODEL_OUTPUT_PATH = RESULT_DATA_DIR / "season_embedding_model.pt"
-MATCHUP_MODEL_OUTPUT_PATH = RESULT_DATA_DIR / "matchup_embedding_model.pt"
+MODEL_OUTPUT_PATH = RESULT_DATA_DIR / "context_embedding_model.pt"
 
 
 @dataclass
 class Config:
-    league_dim: int = 8
-    season_dim: int = 8
-    matchup_dim: int = 4
-    hidden_dim: int = 32
-    epochs: int = 50
+    team_dim: int = 4
+    league_dim: int = 16
+    season_dim: int = 16
+    head_hidden: int = 32
+    epochs: int = 200
     batch_size: int = 512
-    lr: float = 5e-3
-    weight_decay: float = 1e-4
+    lr: float = 3e-3
+    embedding_wd: float = 1e-2
+    head_wd: float = 1e-4
     dropout: float = 0.1
+    patience: int = 20
+    val_frac: float = 0.1
+    grad_clip: float = 5.0
     seed: int = 42
-    early_stopping_patience: int = 10
-    lr_patience: int = 5
-    lr_factor: float = 0.5
-    min_lr: float = 1e-5
-    min_matchup_count: int = 4  # Keep only more stable matchup pairs
 
 
-class ContextDataset(Dataset):
-    def __init__(self, frame: pd.DataFrame, context_cols: list[str]):
-        self.item_indices = torch.tensor(frame[context_cols].values, dtype=torch.long)
-        self.hg = torch.tensor(frame["HG"].values, dtype=torch.float32)
-        self.ag = torch.tensor(frame["AG"].values, dtype=torch.float32)
+# ============================================================================
+# DATA LOADING
+# ============================================================================
 
-    def __len__(self):
-        return len(self.hg)
-
-    def __getitem__(self, idx):
-        return {"item_indices": self.item_indices[idx], "HG": self.hg[idx], "AG": self.ag[idx]}
-
-
-class SingleContextRegressor(nn.Module):
-    """Predicts goal rates from a single context."""
-
-    def __init__(self, n_items, emb_dim, hidden_dim, dropout=0.1):
-        super().__init__()
-        self.emb = nn.Embedding(n_items, emb_dim)
-        self.mlp = nn.Sequential(
-            nn.Linear(emb_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 2, 2),
-        )
-
-    def forward(self, item_idx):
-        x = self.emb(item_idx)
-        out = self.mlp(x)
-        lam_h = F.softplus(out[:, 0]) + 0.1
-        lam_a = F.softplus(out[:, 1]) + 0.1
-        return lam_h, lam_a
-
-
-class CombinedContextRegressor(nn.Module):
-    """Predicts goal rates from combined league + season + matchup."""
-
-    def __init__(self, n_leagues, league_dim, n_seasons, season_dim,
-                 n_matchups, matchup_dim, hidden_dim, dropout=0.1):
-        super().__init__()
-        self.league_emb = nn.Embedding(n_leagues, league_dim)
-        self.season_emb = nn.Embedding(n_seasons, season_dim)
-        self.matchup_emb = nn.Embedding(n_matchups, matchup_dim)
-
-        total_dim = league_dim + season_dim + matchup_dim
-
-        self.mlp = nn.Sequential(
-            nn.Linear(total_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 2, 2),
-        )
-
-    def forward(self, league_idx, season_idx, matchup_idx):
-        league_emb = self.league_emb(league_idx)
-        season_emb = self.season_emb(season_idx)
-        matchup_emb = self.matchup_emb(matchup_idx)
-        x = torch.cat([league_emb, season_emb, matchup_emb], dim=-1)
-        out = self.mlp(x)
-        lam_h = F.softplus(out[:, 0]) + 0.1
-        lam_a = F.softplus(out[:, 1]) + 0.1
-        return lam_h, lam_a
-
-
-def poisson_nll_loss(lam_h, lam_a, hg, ag):
-    loss_h = F.poisson_nll_loss(lam_h, hg, log_input=False, full=True)
-    loss_a = F.poisson_nll_loss(lam_a, ag, log_input=False, full=True)
-    return loss_h + loss_a
-
-
-def compute_metrics(model, loader, device):
-    model.eval()
-    losses, mses, maes = [], [], []
-    home_rates, away_rates = [], []
-
-    with torch.no_grad():
-        for batch in loader:
-            idx = batch["item_indices"].to(device)
-            hg = batch["HG"].to(device)
-            ag = batch["AG"].to(device)
-
-            if idx.dim() == 1:
-                lam_h, lam_a = model(idx)
-            else:
-                lam_h, lam_a = model(idx[:, 0], idx[:, 1], idx[:, 2])
-
-            loss = poisson_nll_loss(lam_h, lam_a, hg, ag)
-            losses.append(float(loss.item()))
-            mses.append(float(F.mse_loss(lam_h - lam_a, hg - ag).item()))
-            maes.append(float(F.l1_loss(lam_h - lam_a, hg - ag).item()))
-            home_rates.append(float(lam_h.mean().item()))
-            away_rates.append(float(lam_a.mean().item()))
-
-    return {
-        "loss": float(np.mean(losses)),
-        "mse": float(np.mean(mses)),
-        "mae": float(np.mean(maes)),
-        "mean_home_rate": float(np.mean(home_rates)),
-        "mean_away_rate": float(np.mean(away_rates)),
-    }
-
-
-def set_seed(seed):
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-
-def load_split_keys(path):
+def load_split_keys(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Missing split source: {path}")
     frame = pd.read_csv(path, low_memory=False)
@@ -202,38 +98,22 @@ def load_split_keys(path):
     return frame[["game_id"]].dropna().drop_duplicates().copy()
 
 
-def load_targets(path):
-    """
-    Load home/away goals from the historical matches file.
-
-    The old target_variables.csv has been removed; we read from
-    big5_matches_fixed.csv instead, normalizing the goal columns to HG / AG.
-
-    Accepts any of these column-name pairs for home/away goals:
-      HG / AG, FTHG / FTAG, Home_goals / Away_goals, home_goals / away_goals
-    """
+def load_targets(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Missing goals source file: {path}")
-
     frame = pd.read_csv(path, low_memory=False)
-
     home_candidates = ["HG", "FTHG", "Home_goals", "home_goals"]
     away_candidates = ["AG", "FTAG", "Away_goals", "away_goals"]
-
     hg_col = next((c for c in home_candidates if c in frame.columns), None)
     ag_col = next((c for c in away_candidates if c in frame.columns), None)
-
     if "game_id" not in frame.columns or hg_col is None or ag_col is None:
         raise KeyError(
             f"Could not locate game_id + goal columns in {path}. "
-            f"Available columns: {list(frame.columns)}"
+            f"Available: {list(frame.columns)}"
         )
-
-    out = (
-        frame[["game_id", hg_col, ag_col]]
-        .rename(columns={hg_col: "HG", ag_col: "AG"})
-        .copy()
-    )
+    out = frame[["game_id", hg_col, ag_col]].rename(
+        columns={hg_col: "HG", ag_col: "AG"}
+    ).copy()
     out["HG"] = pd.to_numeric(out["HG"], errors="coerce")
     out["AG"] = pd.to_numeric(out["AG"], errors="coerce")
     out = out.dropna(subset=["game_id", "HG", "AG"]).drop_duplicates(
@@ -242,369 +122,430 @@ def load_targets(path):
     return out
 
 
-def add_context(frame):
-    ctx = frame["game_id"].astype(str).apply(infer_league_and_season).apply(pd.Series)
-    out = frame.merge(ctx[["game_id", "league", "season"]], on="game_id", how="left")
-    out["league"] = out["league"].fillna("__UNK__")
-    out["season"] = out["season"].fillna("__UNK__")
+def parse_teams(game_id: str):
+    """Extract (home_team, away_team) from '<date>_<home>_<away>'."""
+    parts = str(game_id).split("_")
+    if len(parts) >= 3:
+        return parts[1], parts[2]
+    return "__UNK__", "__UNK__"
 
-    # Extract matchup from game_id: format is "YYYYMMDD_HOME_AWAY"
-    def extract_matchup(game_id):
-        parts = str(game_id).split("_")
-        if len(parts) >= 3:
-            return f"{parts[1]}__{parts[2]}"
-        return "__UNK__"
 
-    out["matchup"] = out["game_id"].apply(extract_matchup)
+def add_context(frame: pd.DataFrame) -> pd.DataFrame:
+    # League and season via the existing helper (game_id -> league, season)
+    ctx = (
+        frame["game_id"].astype(str)
+        .apply(infer_league_and_season)
+        .apply(pd.Series)
+        .reset_index(drop=True)
+    )
+    out = frame.copy().reset_index(drop=True)
+    out["league"] = ctx["league"].fillna("__UNK__").values if "league" in ctx.columns else "__UNK__"
+    out["season"] = ctx["season"].fillna("__UNK__").values if "season" in ctx.columns else "__UNK__"
+
+    teams = out["game_id"].apply(parse_teams).apply(pd.Series)
+    out["home_team"] = teams[0].fillna("__UNK__").values
+    out["away_team"] = teams[1].fillna("__UNK__").values
     return out
 
 
-def build_vocab_with_min_count(train_values, min_count=2):
-    """Build vocab, keeping only items that appear at least min_count times."""
-    value_counts = train_values.astype(str).value_counts()
-    valid_values = value_counts[value_counts >= min_count].index.tolist()
-
+def build_vocab(values, min_count: int = 1) -> dict:
+    vc = values.astype(str).value_counts()
+    valid = vc[vc >= min_count].index.tolist()
     vocab = {"__UNK__": 0}
-    for i, value in enumerate(sorted(valid_values), start=1):
-        if value == "__UNK__":
+    for i, v in enumerate(sorted(valid), start=1):
+        if v == "__UNK__":
             continue
-        vocab[value] = i
+        vocab[v] = i
     return vocab
 
 
-def encode_with_vocab(values, vocab):
+def encode(values, vocab: dict) -> np.ndarray:
     return values.astype(str).map(lambda x: vocab.get(x, 0)).astype(int).values
 
 
-def train_single_context_model(train_df, test_df, context_col, emb_dim, config):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# ============================================================================
+# MODEL: Dixon-Coles attack/defence + league and season offsets
+# ============================================================================
 
-    vocab = build_vocab_with_min_count(
-        train_df[context_col],
-        config.min_matchup_count if context_col == "matchup" else 1,
-    )
-    n_items = max(vocab.values()) + 1
+class ContextDixonColes(nn.Module):
+    """Team attack/defence embeddings + league and season offsets.
 
-    train_df = train_df.copy()
-    test_df = test_df.copy()
-    train_df["item_idx"] = encode_with_vocab(train_df[context_col], vocab)
-    test_df["item_idx"] = encode_with_vocab(test_df[context_col], vocab)
+    The rate for each side is:
+        log(lambda_home) = log(home_prior) + head_home(home_off, league, season)
+        log(lambda_away) = log(away_prior) + head_away(away_off, league, season)
+    where
+        home_off = attack(home) - defence(away)
+        away_off = attack(away) - defence(home)
 
-    model = SingleContextRegressor(n_items, emb_dim, config.hidden_dim, config.dropout).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=config.lr_factor,
-        patience=config.lr_patience, min_lr=config.min_lr
-    )
+    Head output layers are zero-initialized, so the model starts exactly at
+    the priors. This avoids the well-known pathology where a randomly
+    initialized head produces rates far from the data distribution, forcing
+    the optimizer to first undo an offset before learning anything useful.
+    """
 
-    train_loader = DataLoader(ContextDataset(train_df, ["item_idx"]),
-                              batch_size=config.batch_size, shuffle=True)
-    test_loader = DataLoader(ContextDataset(test_df, ["item_idx"]),
-                             batch_size=config.batch_size, shuffle=False)
+    def __init__(self, n_teams, n_leagues, n_seasons, config: Config,
+                 home_prior=1.4, away_prior=1.15):
+        super().__init__()
+        self.attack = nn.Embedding(n_teams, config.team_dim)
+        self.defence = nn.Embedding(n_teams, config.team_dim)
+        self.league = nn.Embedding(n_leagues, config.league_dim)
+        self.season = nn.Embedding(n_seasons, config.season_dim)
 
-    best_test_loss = float("inf")
-    best_epoch = 0
-    epochs_no_improve = 0
-    best_state = None
+        nn.init.normal_(self.attack.weight, std=0.05)
+        nn.init.normal_(self.defence.weight, std=0.05)
+        nn.init.normal_(self.league.weight, std=0.05)
+        nn.init.normal_(self.season.weight, std=0.05)
 
-    print("=" * 70)
-    print(f"TRAINING: {context_col} embedding (n_items={n_items}, dim={emb_dim})")
-    print("=" * 70)
+        self.home_bias = nn.Parameter(torch.tensor(float(np.log(home_prior))))
+        self.away_bias = nn.Parameter(torch.tensor(float(np.log(away_prior))))
 
-    for epoch in range(1, config.epochs + 1):
-        model.train()
-        train_losses = []
-        for batch in train_loader:
-            idx = batch["item_indices"].to(device)
-            hg = batch["HG"].to(device)
-            ag = batch["AG"].to(device)
+        head_in = config.team_dim + config.league_dim + config.season_dim
 
-            optimizer.zero_grad()
-            lam_h, lam_a = model(idx)
-            loss = poisson_nll_loss(lam_h, lam_a, hg, ag)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
-            optimizer.step()
-            train_losses.append(float(loss.item()))
+        self.head_h = nn.Sequential(
+            nn.Linear(head_in, config.head_hidden),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.head_hidden, 1),
+        )
+        self.head_a = nn.Sequential(
+            nn.Linear(head_in, config.head_hidden),
+            nn.GELU(),
+            nn.Dropout(config.dropout),
+            nn.Linear(config.head_hidden, 1),
+        )
+        for h in (self.head_h, self.head_a):
+            nn.init.zeros_(h[-1].weight)
+            nn.init.zeros_(h[-1].bias)
 
-        train_metrics = compute_metrics(model, train_loader, device)
-        test_metrics = compute_metrics(model, test_loader, device)
-        scheduler.step(test_metrics["loss"])
+    def forward(self, home_idx, away_idx, league_idx, season_idx):
+        a_h = self.attack(home_idx)     # (B, team_dim)
+        d_h = self.defence(home_idx)
+        a_a = self.attack(away_idx)
+        d_a = self.defence(away_idx)
 
-        if test_metrics["loss"] < best_test_loss - 1e-4:
-            best_test_loss = test_metrics["loss"]
-            best_epoch = epoch
-            epochs_no_improve = 0
-            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
-        else:
-            epochs_no_improve += 1
+        home_off = a_h - d_a            # home attacking strength vs. away defence
+        away_off = a_a - d_h
 
-        lr_now = optimizer.param_groups[0]['lr']
-        if epoch % 5 == 0 or epoch == 1:
-            print(f"[{context_col}] Ep {epoch:03d}/{config.epochs} | "
-                  f"Train {train_metrics['loss']:.4f} | Test {test_metrics['loss']:.4f} | "
-                  f"λh {test_metrics['mean_home_rate']:.2f} λa {test_metrics['mean_away_rate']:.2f} | "
-                  f"LR {lr_now:.1e}")
+        l_emb = self.league(league_idx)
+        s_emb = self.season(season_idx)
 
-        if epochs_no_improve >= config.early_stopping_patience:
-            print(f"  ⏹ Early stop at epoch {epoch} (best ep {best_epoch}, Loss {best_test_loss:.4f})")
-            break
+        home_in = torch.cat([home_off, l_emb, s_emb], dim=-1)
+        away_in = torch.cat([away_off, l_emb, s_emb], dim=-1)
 
-    if best_state is not None:
-        model.load_state_dict(best_state)
-        print(f"  ✓ Restored best model from epoch {best_epoch}")
-
-    meta = {
-        "context_col": context_col,
-        "vocab": vocab,
-        "embedding_dim": emb_dim,
-        "best_epoch": best_epoch,
-        "best_test_loss": best_test_loss,
-        "config": config.__dict__,
-    }
-    return model, meta
+        log_lam_h = self.home_bias + self.head_h(home_in).squeeze(-1)
+        log_lam_a = self.away_bias + self.head_a(away_in).squeeze(-1)
+        return torch.exp(log_lam_h), torch.exp(log_lam_a)
 
 
-def train_combined_context_model(train_df, test_df, config):
-    """Train combined model with all three context types."""
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# ============================================================================
+# DATASET
+# ============================================================================
 
-    league_vocab = build_vocab_with_min_count(train_df["league"], 1)
-    season_vocab = build_vocab_with_min_count(train_df["season"], 1)
-    matchup_vocab = build_vocab_with_min_count(train_df["matchup"], config.min_matchup_count)
+class MatchDataset(Dataset):
+    def __init__(self, df: pd.DataFrame, key_cols):
+        self.idx = {c: torch.tensor(df[c].values, dtype=torch.long) for c in key_cols}
+        self.hg = torch.tensor(df["HG"].values, dtype=torch.float32)
+        self.ag = torch.tensor(df["AG"].values, dtype=torch.float32)
 
-    n_leagues = max(league_vocab.values()) + 1
-    n_seasons = max(season_vocab.values()) + 1
-    n_matchups = max(matchup_vocab.values()) + 1
+    def __len__(self):
+        return len(self.hg)
 
-    train_df = train_df.copy()
-    test_df = test_df.copy()
-
-    train_df["league_idx"] = encode_with_vocab(train_df["league"], league_vocab)
-    train_df["season_idx"] = encode_with_vocab(train_df["season"], season_vocab)
-    train_df["matchup_idx"] = encode_with_vocab(train_df["matchup"], matchup_vocab)
-
-    test_df["league_idx"] = encode_with_vocab(test_df["league"], league_vocab)
-    test_df["season_idx"] = encode_with_vocab(test_df["season"], season_vocab)
-    test_df["matchup_idx"] = encode_with_vocab(test_df["matchup"], matchup_vocab)
-
-    model = CombinedContextRegressor(
-        n_leagues, config.league_dim,
-        n_seasons, config.season_dim,
-        n_matchups, config.matchup_dim,
-        config.hidden_dim, config.dropout
-    ).to(device)
-
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config.lr, weight_decay=config.weight_decay)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=config.lr_factor,
-        patience=config.lr_patience, min_lr=config.min_lr
-    )
-
-    train_loader = DataLoader(
-        ContextDataset(train_df, ["league_idx", "season_idx", "matchup_idx"]),
-        batch_size=config.batch_size, shuffle=True
-    )
-    test_loader = DataLoader(
-        ContextDataset(test_df, ["league_idx", "season_idx", "matchup_idx"]),
-        batch_size=config.batch_size, shuffle=False
-    )
-
-    best_test_loss = float("inf")
-    best_epoch = 0
-    epochs_no_improve = 0
-    best_state = None
-
-    print("=" * 70)
-    print("TRAINING: combined context (league+season+matchup)")
-    print("=" * 70)
-    print(f"Leagues: {n_leagues} | Seasons: {n_seasons} | Matchups: {n_matchups}")
-
-    for epoch in range(1, config.epochs + 1):
-        model.train()
-        for batch in train_loader:
-            idx = batch["item_indices"].to(device)
-            hg = batch["HG"].to(device)
-            ag = batch["AG"].to(device)
-
-            optimizer.zero_grad()
-            lam_h, lam_a = model(idx[:, 0], idx[:, 1], idx[:, 2])
-            loss = poisson_nll_loss(lam_h, lam_a, hg, ag)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
-            optimizer.step()
-
-        test_metrics = compute_metrics(model, test_loader, device)
-        scheduler.step(test_metrics["loss"])
-
-        if test_metrics["loss"] < best_test_loss - 1e-4:
-            best_test_loss = test_metrics["loss"]
-            best_epoch = epoch
-            epochs_no_improve = 0
-            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
-        else:
-            epochs_no_improve += 1
-
-        if epoch % 5 == 0 or epoch == 1:
-            print(f"[combined] Ep {epoch:03d}/{config.epochs} | "
-                  f"Test {test_metrics['loss']:.4f} | "
-                  f"λh {test_metrics['mean_home_rate']:.2f} λa {test_metrics['mean_away_rate']:.2f}")
-
-        if epochs_no_improve >= config.early_stopping_patience:
-            print(f"  ⏹ Early stop at epoch {epoch}")
-            break
-
-    if best_state is not None:
-        model.load_state_dict(best_state)
-
-    meta = {
-        "league_vocab": league_vocab,
-        "season_vocab": season_vocab,
-        "matchup_vocab": matchup_vocab,
-        "league_dim": config.league_dim,
-        "season_dim": config.season_dim,
-        "matchup_dim": config.matchup_dim,
-        "best_epoch": best_epoch,
-        "best_test_loss": best_test_loss,
-    }
-    return model, meta
+    def __getitem__(self, i):
+        out = {k: v[i] for k, v in self.idx.items()}
+        out["HG"] = self.hg[i]
+        out["AG"] = self.ag[i]
+        return out
 
 
-def export_combined_embeddings(frame, model, meta, prefix="context"):
-    """Export combined embeddings from the trained model."""
-    out = frame.copy()
+def collate(batch):
+    return {k: torch.stack([b[k] for b in batch]) for k in batch[0]}
 
-    league_vocab = meta["league_vocab"]
-    season_vocab = meta["season_vocab"]
-    matchup_vocab = meta["matchup_vocab"]
 
-    out["league_idx"] = encode_with_vocab(out["league"], league_vocab)
-    out["season_idx"] = encode_with_vocab(out["season"], season_vocab)
-    out["matchup_idx"] = encode_with_vocab(out["matchup"], matchup_vocab)
+# ============================================================================
+# TRAINING
+# ============================================================================
 
-    device = next(model.parameters()).device
+def poisson_nll(lh, la, hg, ag):
+    return (F.poisson_nll_loss(lh, hg, log_input=False, full=True)
+            + F.poisson_nll_loss(la, ag, log_input=False, full=True))
 
+
+def eval_loss(model, loader, device) -> float:
+    model.eval()
+    total, n = 0.0, 0
     with torch.no_grad():
-        league_emb = model.league_emb(
-            torch.tensor(out["league_idx"].values, dtype=torch.long, device=device)
-        ).cpu().numpy()
-        season_emb = model.season_emb(
-            torch.tensor(out["season_idx"].values, dtype=torch.long, device=device)
-        ).cpu().numpy()
-        matchup_emb = model.matchup_emb(
-            torch.tensor(out["matchup_idx"].values, dtype=torch.long, device=device)
-        ).cpu().numpy()
-
-    league_cols = [f"league_emb_{i+1}" for i in range(league_emb.shape[1])]
-    season_cols = [f"season_emb_{i+1}" for i in range(season_emb.shape[1])]
-    matchup_cols = [f"matchup_emb_{i+1}" for i in range(matchup_emb.shape[1])]
-
-    league_df = pd.DataFrame(league_emb, columns=league_cols)
-    season_df = pd.DataFrame(season_emb, columns=season_cols)
-    matchup_df = pd.DataFrame(matchup_emb, columns=matchup_cols)
-
-    final = pd.concat([
-        out[["game_id", "HG", "AG"]].reset_index(drop=True),
-        league_df.reset_index(drop=True),
-        season_df.reset_index(drop=True),
-        matchup_df.reset_index(drop=True),
-    ], axis=1)
-
-    final = final.dropna(subset=["HG", "AG"]).drop_duplicates(subset=["game_id"], keep="first")
-    final = final.sort_values("game_id").reset_index(drop=True)
-    return final
+        for b in loader:
+            b = {k: v.to(device) for k, v in b.items()}
+            lh, la = model(b["home_idx"], b["away_idx"],
+                            b["league_idx"], b["season_idx"])
+            total += float(poisson_nll(lh, la, b["HG"], b["AG"]).mean().item())
+            n += 1
+    return total / max(1, n)
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Create league, season, and matchup embeddings.")
-    parser.add_argument("--league-dim", type=int, default=16)
-    parser.add_argument("--season-dim", type=int, default=16)
-    parser.add_argument("--matchup-dim", type=int, default=16)
-    parser.add_argument("--hidden-dim", type=int, default=64)
-    parser.add_argument("--epochs", type=int, default=50)
-    parser.add_argument("--batch-size", type=int, default=512)
-    parser.add_argument("--lr", type=float, default=5e-3)
-    parser.add_argument("--weight-decay", type=float, default=1e-4)
-    parser.add_argument("--dropout", type=float, default=0.1)
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--min-matchup-count", type=int, default=2)
-    args = parser.parse_args()
-    return Config(
-        league_dim=args.league_dim,
-        season_dim=args.season_dim,
-        matchup_dim=args.matchup_dim,
-        hidden_dim=args.hidden_dim,
-        epochs=args.epochs,
-        batch_size=args.batch_size,
-        lr=args.lr,
-        weight_decay=args.weight_decay,
-        dropout=args.dropout,
-        seed=args.seed,
-        min_matchup_count=args.min_matchup_count,
+def train_model(model, train_loader, val_loader, config: Config, device):
+    emb_params = (list(model.attack.parameters())
+                  + list(model.defence.parameters())
+                  + list(model.league.parameters())
+                  + list(model.season.parameters()))
+    head_params = (list(model.head_h.parameters())
+                   + list(model.head_a.parameters())
+                   + [model.home_bias, model.away_bias])
+
+    optimizer = torch.optim.AdamW([
+        {"params": emb_params, "weight_decay": config.embedding_wd},
+        {"params": head_params, "weight_decay": config.head_wd},
+    ], lr=config.lr)
+
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=10, min_lr=1e-5
     )
 
+    best_val = float("inf")
+    best_state = None
+    no_improve = 0
+
+    print("\n" + "=" * 70)
+    print("TRAINING CONTEXT MODEL (Dixon-Coles attack/defence + league + season)")
+    print("=" * 70)
+    print(f"  n_teams={len(model.attack.weight)}  n_leagues={len(model.league.weight)}  "
+          f"n_seasons={len(model.season.weight)}")
+    print(f"  team_dim={model.attack.embedding_dim}  "
+          f"league_dim={model.league.embedding_dim}  "
+          f"season_dim={model.season.embedding_dim}")
+
+    for epoch in range(1, config.epochs + 1):
+        model.train()
+        tr_losses = []
+        for b in train_loader:
+            b = {k: v.to(device) for k, v in b.items()}
+            optimizer.zero_grad()
+            lh, la = model(b["home_idx"], b["away_idx"],
+                            b["league_idx"], b["season_idx"])
+            loss = poisson_nll(lh, la, b["HG"], b["AG"]).mean()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip)
+            optimizer.step()
+            tr_losses.append(float(loss.item()))
+
+        val_loss = eval_loss(model, val_loader, device)
+        scheduler.step(val_loss)
+
+        if val_loss < best_val - 1e-4:
+            best_val = val_loss
+            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+            no_improve = 0
+        else:
+            no_improve += 1
+
+        if epoch % 10 == 0 or epoch == 1:
+            print(f"  Ep {epoch:03d}/{config.epochs} | "
+                  f"train {np.mean(tr_losses):.4f} | val {val_loss:.4f}")
+
+        if no_improve >= config.patience:
+            print(f"  Early stop at epoch {epoch} (best val {best_val:.4f})")
+            break
+
+    if best_state is not None:
+        model.load_state_dict(best_state)
+    return model, best_val
+
+
+# ============================================================================
+# EXPORT
+# ============================================================================
+
+def export_embeddings(model, df, team_vocab, league_vocab, season_vocab, device):
+    """Return (league_df, season_df, matchup_df)."""
+    home_idx = torch.tensor(encode(df["home_team"], team_vocab), dtype=torch.long, device=device)
+    away_idx = torch.tensor(encode(df["away_team"], team_vocab), dtype=torch.long, device=device)
+    league_idx = torch.tensor(encode(df["league"], league_vocab), dtype=torch.long, device=device)
+    season_idx = torch.tensor(encode(df["season"], season_vocab), dtype=torch.long, device=device)
+
+    model.eval()
+    with torch.no_grad():
+        a_h = model.attack(home_idx).cpu().numpy()
+        d_h = model.defence(home_idx).cpu().numpy()
+        a_a = model.attack(away_idx).cpu().numpy()
+        d_a = model.defence(away_idx).cpu().numpy()
+        l_emb = model.league(league_idx).cpu().numpy()
+        s_emb = model.season(season_idx).cpu().numpy()
+
+    # Matchup features = [home_attack, home_defence, away_attack, away_defence]
+    matchup = np.concatenate([a_h, d_h, a_a, d_a], axis=1)
+
+    base = df[["game_id", "HG", "AG"]].reset_index(drop=True)
+
+    def make(feat, prefix):
+        cols = [f"{prefix}_{i+1}" for i in range(feat.shape[1])]
+        return pd.concat([base, pd.DataFrame(feat, columns=cols)], axis=1)
+
+    return (make(l_emb, "league_emb"),
+            make(s_emb, "season_emb"),
+            make(matchup, "matchup_emb"))
+
+
+# ============================================================================
+# MAIN
+# ============================================================================
 
 def main():
-    config = parse_args()
-    set_seed(config.seed)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--team-dim", type=int, default=4)
+    parser.add_argument("--league-dim", type=int, default=16)
+    parser.add_argument("--season-dim", type=int, default=16)
+    parser.add_argument("--head-hidden", type=int, default=32)
+    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument("--lr", type=float, default=3e-3)
+    parser.add_argument("--embedding-wd", type=float, default=1e-2)
+    parser.add_argument("--head-wd", type=float, default=1e-4)
+    parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--patience", type=int, default=20)
+    parser.add_argument("--seed", type=int, default=42)
+    args = parser.parse_args()
+
+    config = Config(
+        team_dim=args.team_dim, league_dim=args.league_dim, season_dim=args.season_dim,
+        head_hidden=args.head_hidden, epochs=args.epochs, batch_size=args.batch_size,
+        lr=args.lr, embedding_wd=args.embedding_wd, head_wd=args.head_wd,
+        dropout=args.dropout, patience=args.patience, seed=args.seed,
+    )
+
+    torch.manual_seed(config.seed)
+    np.random.seed(config.seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
 
     FINAL_DATA_DIR.mkdir(parents=True, exist_ok=True)
     MISC_DIR.mkdir(parents=True, exist_ok=True)
     RESULT_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+    # --- Load splits and goals ---
     train_keys = load_split_keys(TRAIN_SPLIT_SOURCE)
     test_keys = load_split_keys(TEST_SPLIT_SOURCE)
     targets = load_targets(GOALS_SOURCE_PATH)
-
     print(f"Loaded {len(targets)} match results from {GOALS_SOURCE_PATH.name}")
 
-    train_df = train_keys.merge(targets, on="game_id", how="left").dropna(subset=["HG", "AG"]).copy()
+    train_full = train_keys.merge(targets, on="game_id", how="left").dropna(subset=["HG", "AG"]).copy()
     test_df = test_keys.merge(targets, on="game_id", how="left").dropna(subset=["HG", "AG"]).copy()
 
-    if train_df.empty or test_df.empty:
-        raise ValueError(
-            f"Empty train or test split after merging goals. "
-            f"Train={len(train_df)}, Test={len(test_df)}. "
-            f"Check that game_ids in {TRAIN_SPLIT_SOURCE.name} and "
-            f"{GOALS_SOURCE_PATH.name} match."
-        )
+    if train_full.empty or test_df.empty:
+        raise ValueError(f"Empty split. Train={len(train_full)}, Test={len(test_df)}")
 
-    train_df = add_context(train_df)
+    train_full = add_context(train_full)
     test_df = add_context(test_df)
+    print(f"Train rows: {len(train_full)} | Test rows: {len(test_df)}")
 
-    print(f"Train rows: {len(train_df)} | Test rows: {len(test_df)}")
-    print(f"Unique matchups (train): {train_df['matchup'].nunique()}")
+    # --- Build vocabularies from training data only ---
+    all_train_teams = pd.concat([train_full["home_team"], train_full["away_team"]])
+    team_vocab = build_vocab(all_train_teams, min_count=2)
+    league_vocab = build_vocab(train_full["league"], min_count=1)
+    season_vocab = build_vocab(train_full["season"], min_count=1)
 
-    model, meta = train_combined_context_model(train_df, test_df, config)
+    n_teams = max(team_vocab.values()) + 1
+    n_leagues = max(league_vocab.values()) + 1
+    n_seasons = max(season_vocab.values()) + 1
+    print(f"Vocabs: teams={n_teams} leagues={n_leagues} seasons={n_seasons}")
 
-    train_out = export_combined_embeddings(train_df, model, meta)
-    test_out = export_combined_embeddings(test_df, model, meta)
+    # --- Encode on both splits (unseen values -> __UNK__ = index 0) ---
+    for df in (train_full, test_df):
+        df["home_idx"] = encode(df["home_team"], team_vocab)
+        df["away_idx"] = encode(df["away_team"], team_vocab)
+        df["league_idx"] = encode(df["league"], league_vocab)
+        df["season_idx"] = encode(df["season"], season_vocab)
 
-    league_cols = [c for c in train_out.columns if c.startswith("league_emb_")]
-    season_cols = [c for c in train_out.columns if c.startswith("season_emb_")]
-    matchup_cols = [c for c in train_out.columns if c.startswith("matchup_emb_")]
+    # --- Train/val split of training data ---
+    rng = np.random.default_rng(config.seed)
+    perm = rng.permutation(len(train_full))
+    n_val = int(len(train_full) * config.val_frac)
+    val_idx, train_idx = perm[:n_val], perm[n_val:]
+    train_df = train_full.iloc[train_idx].reset_index(drop=True)
+    val_df = train_full.iloc[val_idx].reset_index(drop=True)
+    print(f"Split: train={len(train_df)}  val={len(val_df)}")
 
-    base_cols = ["game_id", "HG", "AG"]
+    key_cols = ["home_idx", "away_idx", "league_idx", "season_idx"]
+    train_loader = DataLoader(MatchDataset(train_df, key_cols),
+                              batch_size=config.batch_size, shuffle=True, collate_fn=collate)
+    val_loader = DataLoader(MatchDataset(val_df, key_cols),
+                            batch_size=config.batch_size, shuffle=False, collate_fn=collate)
 
-    train_out[base_cols + league_cols].to_csv(LEAGUE_TRAIN_OUTPUT_PATH, index=False)
-    test_out[base_cols + league_cols].to_csv(LEAGUE_TEST_OUTPUT_PATH, index=False)
+    # --- Model ---
+    home_prior = float(train_df["HG"].mean())
+    away_prior = float(train_df["AG"].mean())
+    model = ContextDixonColes(n_teams, n_leagues, n_seasons, config,
+                              home_prior=home_prior, away_prior=away_prior).to(device)
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"Model parameters: {n_params:,}  (priors: home={home_prior:.3f}, away={away_prior:.3f})")
 
-    train_out[base_cols + season_cols].to_csv(SEASON_TRAIN_OUTPUT_PATH, index=False)
-    test_out[base_cols + season_cols].to_csv(SEASON_TEST_OUTPUT_PATH, index=False)
+    model, best_val = train_model(model, train_loader, val_loader, config, device)
 
-    train_out[base_cols + matchup_cols].to_csv(MATCHUP_TRAIN_OUTPUT_PATH, index=False)
-    test_out[base_cols + matchup_cols].to_csv(MATCHUP_TEST_OUTPUT_PATH, index=False)
+    # --- Test evaluation ---
+    test_loader = DataLoader(MatchDataset(test_df, key_cols),
+                             batch_size=config.batch_size, shuffle=False, collate_fn=collate)
+    test_nll = eval_loss(model, test_loader, device)
 
-    torch.save({"state_dict": model.state_dict(), "meta": meta}, MATCHUP_MODEL_OUTPUT_PATH)
+    naive_nll = float(poisson_nll(
+        torch.full((len(test_df),), float(test_df["HG"].mean())),
+        torch.full((len(test_df),), float(test_df["AG"].mean())),
+        torch.tensor(test_df["HG"].values, dtype=torch.float32),
+        torch.tensor(test_df["AG"].values, dtype=torch.float32),
+    ).mean().item())
 
+    print(f"\nBest val NLL: {best_val:.4f}")
+    print(f"Test  NLL:    {test_nll:.4f}  (naive: {naive_nll:.4f}, "
+          f"delta: {test_nll - naive_nll:+.4f})")
+
+    # --- Spread diagnostics ---
+    model.eval()
+    with torch.no_grad():
+        th = torch.tensor(test_df["home_idx"].values, dtype=torch.long, device=device)
+        ta = torch.tensor(test_df["away_idx"].values, dtype=torch.long, device=device)
+        tl = torch.tensor(test_df["league_idx"].values, dtype=torch.long, device=device)
+        tsea = torch.tensor(test_df["season_idx"].values, dtype=torch.long, device=device)
+        lh, la = model(th, ta, tl, tsea)
+        lh, la = lh.cpu().numpy(), la.cpu().numpy()
+    print(f"Test predicted lambda_home: mean={lh.mean():.3f} std={lh.std():.3f}")
+    print(f"Test predicted lambda_away: mean={la.mean():.3f} std={la.std():.3f}")
+
+    # --- Export embeddings ---
+    league_train, season_train, matchup_train = export_embeddings(
+        model, train_full, team_vocab, league_vocab, season_vocab, device
+    )
+    league_test, season_test, matchup_test = export_embeddings(
+        model, test_df, team_vocab, league_vocab, season_vocab, device
+    )
+
+    league_train.to_csv(LEAGUE_TRAIN_OUTPUT_PATH, index=False)
+    league_test.to_csv(LEAGUE_TEST_OUTPUT_PATH, index=False)
+    season_train.to_csv(SEASON_TRAIN_OUTPUT_PATH, index=False)
+    season_test.to_csv(SEASON_TEST_OUTPUT_PATH, index=False)
+    matchup_train.to_csv(MATCHUP_TRAIN_OUTPUT_PATH, index=False)
+    matchup_test.to_csv(MATCHUP_TEST_OUTPUT_PATH, index=False)
+
+    meta = {
+        "team_vocab": team_vocab,
+        "league_vocab": league_vocab,
+        "season_vocab": season_vocab,
+        "team_dim": config.team_dim,
+        "league_dim": config.league_dim,
+        "season_dim": config.season_dim,
+        "matchup_dim": 4 * config.team_dim,
+        "best_val_nll": best_val,
+        "test_nll": test_nll,
+        "naive_test_nll": naive_nll,
+        "test_std_lambda_home": float(lh.std()),
+        "test_std_lambda_away": float(la.std()),
+        "config": config.__dict__,
+    }
+    torch.save({"state_dict": model.state_dict(), "meta": meta}, MODEL_OUTPUT_PATH)
     META_OUTPUT_PATH.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
-    print(f"\nSaved LEAGUE TRAIN: {train_out[base_cols + league_cols].shape}")
-    print(f"Saved LEAGUE TEST: {test_out[base_cols + league_cols].shape}")
-    print(f"Saved SEASON TRAIN: {train_out[base_cols + season_cols].shape}")
-    print(f"Saved SEASON TEST: {test_out[base_cols + season_cols].shape}")
-    print(f"Saved MATCHUP TRAIN: {train_out[base_cols + matchup_cols].shape}")
-    print(f"Saved MATCHUP TEST: {test_out[base_cols + matchup_cols].shape}")
+    print(f"\nSaved league:  train {league_train.shape}, test {league_test.shape}")
+    print(f"Saved season:  train {season_train.shape}, test {season_test.shape}")
+    print(f"Saved matchup: train {matchup_train.shape}, test {matchup_test.shape}")
+    print(f"Saved model:   {MODEL_OUTPUT_PATH}")
+    print(f"Saved meta:    {META_OUTPUT_PATH}")
 
 
 if __name__ == "__main__":

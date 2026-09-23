@@ -3,18 +3,29 @@
 
 """Compute league / season / matchup embeddings for UPCOMING fixtures (dashboard).
 
-Reuses the trained combined context model and its vocabularies. Never retrains,
-never rebuilds vocabularies.
+Uses the OPTIMIZED Dixon-Coles style context model:
+- Team attack/defence embeddings instead of a per-pair matchup embedding
+- League and season share the head with the team offsets
+- A match's "matchup" embedding = [home_attack, home_defence,
+                                   away_attack, away_defence]
+  i.e. 4 * team_dim columns, whereas league/season embeddings come from
+  their own embedding tables.
+
+Reuses the trained model and its vocabularies. Never retrains.
 
 Reads:
 - 5_new_prediction_dashboard/upcoming_lineups/upcoming_lineups_latest.csv
-- result_data/matchup_embedding_model.pt   (contains both state_dict + meta)
+- result_data/context_embedding_model.pt   (state_dict + meta)
 - src/game_id_context.py (for infer_league_and_season)
 
 Writes:
 - prediction_data/upcoming_league_embeddings.csv
 - prediction_data/upcoming_season_embeddings.csv
 - prediction_data/upcoming_matchup_embeddings.csv
+
+IMPORTANT: result_data/context_embedding_model.pt must have been produced
+by the matching OPTIMIZED training script. If it was produced by the older
+per-pair matchup model, this script will fail with a clear error.
 """
 
 from __future__ import annotations
@@ -42,7 +53,7 @@ if str(PROJECT_DIR) not in sys.path:
 from src.game_id_context import infer_league_and_season  # noqa: E402
 
 UPCOMING_LINEUPS_PATH = SCRIPT_DIR / "upcoming_lineups" / "upcoming_lineups_latest.csv"
-MODEL_PATH = PROJECT_DIR / "result_data" / "matchup_embedding_model.pt"
+MODEL_PATH = PROJECT_DIR / "result_data" / "context_embedding_model.pt"
 PREDICTION_DATA_DIR = SCRIPT_DIR / "prediction_data"
 
 LEAGUE_OUTPUT_PATH = PREDICTION_DATA_DIR / "upcoming_league_embeddings.csv"
@@ -53,60 +64,107 @@ PREDICTION_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ============================================================================
-# MODEL DEFINITION (identical to training)
+# MODEL DEFINITION (must exactly mirror the OPTIMIZED training script)
 # ============================================================================
 
-class CombinedContextRegressor(nn.Module):
-    """Predicts goal rates from combined league + season + matchup."""
+class ContextDixonColes(nn.Module):
+    """Team attack/defence embeddings + league and season offsets.
 
-    def __init__(self, n_leagues, league_dim, n_seasons, season_dim,
-                 n_matchups, matchup_dim, hidden_dim, dropout=0.1):
+        log(lambda_home) = log(home_prior) + head_h(home_off, league, season)
+        log(lambda_away) = log(away_prior) + head_a(away_off, league, season)
+
+    where
+        home_off = attack(home) - defence(away)
+        away_off = attack(away) - defence(home)
+
+    Only the embedding tables are needed for the dashboard; the heads and
+    priors are loaded so that state_dict keys match exactly.
+    """
+
+    def __init__(self, n_teams, n_leagues, n_seasons,
+                 team_dim, league_dim, season_dim, head_hidden, dropout=0.1,
+                 home_prior=1.4, away_prior=1.15):
         super().__init__()
-        self.league_emb = nn.Embedding(n_leagues, league_dim)
-        self.season_emb = nn.Embedding(n_seasons, season_dim)
-        self.matchup_emb = nn.Embedding(n_matchups, matchup_dim)
+        self.attack = nn.Embedding(n_teams, team_dim)
+        self.defence = nn.Embedding(n_teams, team_dim)
+        self.league = nn.Embedding(n_leagues, league_dim)
+        self.season = nn.Embedding(n_seasons, season_dim)
 
-        total_dim = league_dim + season_dim + matchup_dim
+        self.home_bias = nn.Parameter(torch.tensor(float(np.log(home_prior))))
+        self.away_bias = nn.Parameter(torch.tensor(float(np.log(away_prior))))
 
-        self.mlp = nn.Sequential(
-            nn.Linear(total_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(),
+        head_in = team_dim + league_dim + season_dim
+
+        self.head_h = nn.Sequential(
+            nn.Linear(head_in, head_hidden),
+            nn.GELU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 2, 2),
+            nn.Linear(head_hidden, 1),
+        )
+        self.head_a = nn.Sequential(
+            nn.Linear(head_in, head_hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(head_hidden, 1),
         )
 
-    def forward(self, league_idx, season_idx, matchup_idx):
-        league_emb = self.league_emb(league_idx)
-        season_emb = self.season_emb(season_idx)
-        matchup_emb = self.matchup_emb(matchup_idx)
-        x = torch.cat([league_emb, season_emb, matchup_emb], dim=-1)
-        out = self.mlp(x)
-        lam_h = F.softplus(out[:, 0]) + 0.1
-        lam_a = F.softplus(out[:, 1]) + 0.1
-        return lam_h, lam_a
+    def forward(self, home_idx, away_idx, league_idx, season_idx):
+        a_h = self.attack(home_idx)
+        d_h = self.defence(home_idx)
+        a_a = self.attack(away_idx)
+        d_a = self.defence(away_idx)
+
+        home_off = a_h - d_a
+        away_off = a_a - d_h
+
+        l_emb = self.league(league_idx)
+        s_emb = self.season(season_idx)
+
+        home_in = torch.cat([home_off, l_emb, s_emb], dim=-1)
+        away_in = torch.cat([away_off, l_emb, s_emb], dim=-1)
+
+        log_lam_h = self.home_bias + self.head_h(home_in).squeeze(-1)
+        log_lam_a = self.away_bias + self.head_a(away_in).squeeze(-1)
+        return torch.exp(log_lam_h), torch.exp(log_lam_a)
 
 
 # ============================================================================
 # HELPERS
 # ============================================================================
 
-def add_context(frame):
-    """Compute league / season / matchup from game_id, same as training."""
-    ctx = frame["game_id"].astype(str).apply(infer_league_and_season).apply(pd.Series)
-    out = frame.merge(ctx[["game_id", "league", "season"]], on="game_id", how="left")
-    out["league"] = out["league"].fillna("__UNK__")
-    out["season"] = out["season"].fillna("__UNK__")
+def parse_teams(game_id: str):
+    """Extract (home_team, away_team) from '<date>_<home>_<away>'.
 
-    def extract_matchup(game_id):
-        parts = str(game_id).split("_")
-        if len(parts) >= 3:
-            return f"{parts[1]}__{parts[2]}"
-        return "__UNK__"
+    Mirrors the training-time extraction exactly. Falls back to __UNK__.
+    """
+    parts = str(game_id).split("_")
+    if len(parts) >= 3:
+        return parts[1], parts[2]
+    return "__UNK__", "__UNK__"
 
-    out["matchup"] = out["game_id"].apply(extract_matchup)
+
+def add_context(frame: pd.DataFrame) -> pd.DataFrame:
+    """Compute league / season / home_team / away_team from game_id."""
+    ctx = (
+        frame["game_id"].astype(str)
+        .apply(infer_league_and_season)
+        .apply(pd.Series)
+        .reset_index(drop=True)
+    )
+    out = frame.copy().reset_index(drop=True)
+
+    if "league" in ctx.columns:
+        out["league"] = ctx["league"].fillna("__UNK__").values
+    else:
+        out["league"] = "__UNK__"
+    if "season" in ctx.columns:
+        out["season"] = ctx["season"].fillna("__UNK__").values
+    else:
+        out["season"] = "__UNK__"
+
+    teams = out["game_id"].apply(parse_teams).apply(pd.Series)
+    out["home_team"] = teams[0].fillna("__UNK__").values
+    out["away_team"] = teams[1].fillna("__UNK__").values
     return out
 
 
@@ -121,7 +179,7 @@ def encode_with_vocab(values, vocab):
 
 def main():
     print("=" * 78)
-    print("DASHBOARD: League / Season / Matchup embeddings for upcoming fixtures")
+    print("DASHBOARD: League / Season / Matchup embeddings (optimized context model)")
     print("=" * 78)
 
     # ------------------------------------------------------------------
@@ -129,6 +187,7 @@ def main():
     # ------------------------------------------------------------------
     if not MODEL_PATH.exists():
         print(f"Error: trained context model not found at {MODEL_PATH}")
+        print("       Re-run the optimized context training script to generate it.")
         return
 
     checkpoint = torch.load(MODEL_PATH, map_location="cpu")
@@ -139,33 +198,60 @@ def main():
               f"(vocabularies + dims are required).")
         return
 
+    required = ["team_vocab", "league_vocab", "season_vocab",
+                "team_dim", "league_dim", "season_dim", "matchup_dim"]
+    missing = [k for k in required if k not in meta]
+    if missing:
+        raise RuntimeError(
+            f"Checkpoint meta is missing required keys: {missing}\n"
+            f"  This usually means {MODEL_PATH.name} was produced by an "
+            f"older training script.\n"
+            f"  Re-run the optimized context training script to regenerate it."
+        )
+
+    team_vocab = meta["team_vocab"]
     league_vocab = meta["league_vocab"]
     season_vocab = meta["season_vocab"]
-    matchup_vocab = meta["matchup_vocab"]
 
+    team_dim = meta["team_dim"]
     league_dim = meta["league_dim"]
     season_dim = meta["season_dim"]
-    matchup_dim = meta["matchup_dim"]
+    matchup_dim = meta["matchup_dim"]  # = 4 * team_dim
 
+    n_teams = max(team_vocab.values()) + 1
     n_leagues = max(league_vocab.values()) + 1
     n_seasons = max(season_vocab.values()) + 1
-    n_matchups = max(matchup_vocab.values()) + 1
+
+    # Infer head_hidden from the saved state dict
+    #   head_h.0.weight has shape (head_hidden, team_dim + league_dim + season_dim)
+    head_hidden = state_dict["head_h.0.weight"].shape[0]
 
     print(f"Loaded trained context model:")
+    print(f"  Teams:    {n_teams} (dim {team_dim} each for attack and defence)")
     print(f"  Leagues:  {n_leagues} (dim {league_dim})")
     print(f"  Seasons:  {n_seasons} (dim {season_dim})")
-    print(f"  Matchups: {n_matchups} (dim {matchup_dim})")
+    print(f"  Matchup:  {matchup_dim} dims (= 4 x team_dim)")
+    print(f"  Head hidden: {head_hidden}")
 
-    # Determine hidden_dim from state_dict (safer than hardcoding)
-    hidden_dim = state_dict["mlp.0.weight"].shape[0]
-
-    model = CombinedContextRegressor(
-        n_leagues, league_dim,
-        n_seasons, season_dim,
-        n_matchups, matchup_dim,
-        hidden_dim,
+    model = ContextDixonColes(
+        n_teams=n_teams, n_leagues=n_leagues, n_seasons=n_seasons,
+        team_dim=team_dim, league_dim=league_dim, season_dim=season_dim,
+        head_hidden=head_hidden,
     )
-    model.load_state_dict(state_dict)
+
+    # Strict load: any architecture mismatch gives an explicit error.
+    try:
+        model.load_state_dict(state_dict, strict=True)
+    except RuntimeError as e:
+        raise RuntimeError(
+            "Context model architecture does not match the checkpoint.\n"
+            "  This usually means the checkpoint was produced by an older "
+            "training script (e.g. the per-pair matchup model).\n"
+            "  Re-run the optimized training script to regenerate "
+            "context_embedding_model.pt.\n"
+            f"  PyTorch detail: {e}"
+        ) from e
+
     model.eval()
 
     # ------------------------------------------------------------------
@@ -187,50 +273,63 @@ def main():
         )
 
     # ------------------------------------------------------------------
-    # Attach league/season/matchup context
+    # Attach league / season / teams
     # ------------------------------------------------------------------
     upcoming = add_context(upcoming)
 
-    # Report known vs unknown context categories
-    unknown_leagues = set(upcoming.loc[~upcoming["league"].isin(league_vocab), "league"])
-    unknown_seasons = set(upcoming.loc[~upcoming["season"].isin(season_vocab), "season"])
-    unknown_matchups = set(upcoming.loc[~upcoming["matchup"].isin(matchup_vocab), "matchup"])
+    # Report out-of-vocabulary categories so the user knows if embeddings
+    # will fall back to __UNK__.
+    unknown_leagues = sorted(set(upcoming.loc[~upcoming["league"].isin(league_vocab), "league"]))
+    unknown_seasons = sorted(set(upcoming.loc[~upcoming["season"].isin(season_vocab), "season"]))
+    unknown_teams = sorted(
+        set(upcoming.loc[~upcoming["home_team"].isin(team_vocab), "home_team"])
+        | set(upcoming.loc[~upcoming["away_team"].isin(team_vocab), "away_team"])
+    )
 
     if unknown_leagues:
-        print(f"\n⚠ {len(unknown_leagues)} league(s) not in training vocab:")
-        for l in sorted(unknown_leagues):
+        print(f"\n⚠ {len(unknown_leagues)} league(s) not in training vocab (→ __UNK__):")
+        for l in unknown_leagues:
             print(f"    - {l}")
     if unknown_seasons:
-        print(f"\n⚠ {len(unknown_seasons)} season(s) not in training vocab:")
-        for s in sorted(unknown_seasons):
+        print(f"\n⚠ {len(unknown_seasons)} season(s) not in training vocab (→ __UNK__):")
+        for s in unknown_seasons:
             print(f"    - {s}")
-    if unknown_matchups:
-        print(f"\n⚠ {len(unknown_matchups)} matchup(s) not in training vocab "
-              f"(→ will map to __UNK__):")
-        for m in sorted(unknown_matchups)[:15]:
-            print(f"    - {m}")
-        if len(unknown_matchups) > 15:
-            print(f"    ... and {len(unknown_matchups) - 15} more")
+    if unknown_teams:
+        print(f"\n⚠ {len(unknown_teams)} team(s) not in training vocab (→ __UNK__):")
+        for t in unknown_teams[:15]:
+            print(f"    - {t}")
+        if len(unknown_teams) > 15:
+            print(f"    ... and {len(unknown_teams) - 15} more")
 
     # ------------------------------------------------------------------
     # Encode indices
     # ------------------------------------------------------------------
+    home_idx = encode_with_vocab(upcoming["home_team"], team_vocab)
+    away_idx = encode_with_vocab(upcoming["away_team"], team_vocab)
     league_idx = encode_with_vocab(upcoming["league"], league_vocab)
     season_idx = encode_with_vocab(upcoming["season"], season_vocab)
-    matchup_idx = encode_with_vocab(upcoming["matchup"], matchup_vocab)
 
+    home_t = torch.tensor(home_idx, dtype=torch.long)
+    away_t = torch.tensor(away_idx, dtype=torch.long)
     league_t = torch.tensor(league_idx, dtype=torch.long)
     season_t = torch.tensor(season_idx, dtype=torch.long)
-    matchup_t = torch.tensor(matchup_idx, dtype=torch.long)
 
     # ------------------------------------------------------------------
-    # Extract embeddings (no goal-rate prediction needed — we only want the
-    # embedding vectors, matching what training exported)
+    # Extract embeddings
     # ------------------------------------------------------------------
     with torch.no_grad():
-        league_emb = model.league_emb(league_t).numpy()
-        season_emb = model.season_emb(season_t).numpy()
-        matchup_emb = model.matchup_emb(matchup_t).numpy()
+        league_emb = model.league(league_t).numpy()                       # (N, league_dim)
+        season_emb = model.season(season_t).numpy()                       # (N, season_dim)
+
+        home_attack = model.attack(home_t).numpy()                        # (N, team_dim)
+        home_defence = model.defence(home_t).numpy()                      # (N, team_dim)
+        away_attack = model.attack(away_t).numpy()                        # (N, team_dim)
+        away_defence = model.defence(away_t).numpy()                      # (N, team_dim)
+
+    # Matchup embedding = concatenation of the four team vectors
+    matchup_emb = np.concatenate(
+        [home_attack, home_defence, away_attack, away_defence], axis=1
+    )                                                                     # (N, 4*team_dim)
 
     base_cols = {
         "game_id": upcoming["game_id"].astype(str).values,
@@ -241,15 +340,15 @@ def main():
 
     league_cols = [f"league_emb_{i+1}" for i in range(league_dim)]
     season_cols = [f"season_emb_{i+1}" for i in range(season_dim)]
-    matchup_cols = [f"matchup_emb_{i+1}" for i in range(matchup_dim)]
+    matchup_cols = [f"matchup_emb_{i+1}" for i in range(matchup_emb.shape[1])]
 
     league_df = pd.DataFrame({**base_cols, **dict(zip(league_cols, league_emb.T))})
     season_df = pd.DataFrame({**base_cols, **dict(zip(season_cols, season_emb.T))})
     matchup_df = pd.DataFrame({**base_cols, **dict(zip(matchup_cols, matchup_emb.T))})
 
     # ------------------------------------------------------------------
-    # Save (three separate files, matching training output naming)
-    # ==================================================================
+    # Save
+    # ------------------------------------------------------------------
     league_df.to_csv(LEAGUE_OUTPUT_PATH, index=False, encoding="utf-8-sig")
     season_df.to_csv(SEASON_OUTPUT_PATH, index=False, encoding="utf-8-sig")
     matchup_df.to_csv(MATCHUP_OUTPUT_PATH, index=False, encoding="utf-8-sig")

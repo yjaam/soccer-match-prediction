@@ -1,0 +1,58 @@
+{
+  "run_date": "2026-09-23T16:30:33",
+  "rule": "home_wins_if_higher_market_value_else_away",
+  "value_columns": {
+    "home": [
+      "Home_Goalkeeper_Avg_Value",
+      "Home_Defender_Avg_Value",
+      "Home_Midfielder_Avg_Value",
+      "Home_Attacker_Avg_Value"
+    ],
+    "away": [
+      "Away_Goalkeeper_Avg_Value",
+      "Away_Defender_Avg_Value",
+      "Away_Midfielder_Avg_Value",
+      "Away_Attacker_Avg_Value"
+    ]
+  },
+  "tie_break_label": "HOME_WIN",
+  "historical": {
+    "n_total": 23660,
+    "n_train": 20111,
+    "n_val": 3549,
+    "val_metrics": {
+      "accuracy": 0.5094392786700479,
+      "balanced_accuracy": 0.4545159491433522,
+      "macro_f1": 0.38672391476419093,
+      "confusion_matrix": [
+        [
+          1024,
+          0,
+          498
+        ],
+        [
+          407,
+          0,
+          485
+        ],
+        [
+          351,
+          0,
+          784
+        ]
+      ],
+      "n_rows": 3549
+    },
+    "val_prediction_distribution": {
+      "HOME": 1782,
+      "DRAW": 0,
+      "AWAY": 1767
+    },
+    "val_actual_distribution": {
+      "HOME": 1522,
+      "DRAW": 892,
+      "AWAY": 1135
+    }
+  },
+  "upcoming": null
+}

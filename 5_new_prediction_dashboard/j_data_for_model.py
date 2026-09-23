@@ -6,9 +6,11 @@
 This is the dashboard variant of the original training-time data-prep script.
 
 Difference from training-time script:
-- The "TRAIN" side contains ALL historical matches (train + test split from
-  the original training run are concatenated). This lets the model learn from
-  the full history up to and including the 2025-2026 season.
+- The "TRAIN" side contains ALL historical matches (every module's full
+  *TRAIN.csv and *TEST.csv are concatenated, so the model always learns from
+  everything that has been scraped up to now). No fixed season cutoff is
+  used anywhere — if a new module's TRAIN file grows, the historical side
+  grows with it automatically.
 - The "TEST" side contains the current UPCOMING fixtures, sourced from the
   dashboard's ./prediction_data/upcoming_*.csv files.
 - Standardization statistics are fit on the full historical data.
@@ -17,13 +19,8 @@ Goals are read from data/big5_matches_fixed.csv (the legacy
 target_variables.csv has been removed).
 
 Outputs (all inside the dashboard folder):
-- nn_input_data/nn_input_lineup_TRAIN.csv,     nn_input_data/nn_input_lineup_TEST.csv
-- nn_input_data/nn_input_player_stats_TRAIN.csv, nn_input_data/nn_input_player_stats_TEST.csv
-- nn_input_data/nn_input_skill_matchups_TRAIN.csv, nn_input_data/nn_input_skill_matchups_TEST.csv
-- nn_input_data/nn_input_match_stats_TRAIN.csv, nn_input_data/nn_input_match_stats_TEST.csv
-- nn_input_data/nn_input_league_TRAIN.csv,     nn_input_data/nn_input_league_TEST.csv
-- nn_input_data/nn_input_season_TRAIN.csv,     nn_input_data/nn_input_season_TEST.csv
-- nn_input_data/nn_input_matchup_TRAIN.csv,    nn_input_data/nn_input_matchup_TEST.csv
+- nn_input_data/nn_input_<module>_TRAIN.csv, nn_input_data/nn_input_<module>_TEST.csv
+  for every module in MODULE_SPECS that has usable data.
 - nn_input_data/nn_module_metadata.json
 """
 
@@ -56,60 +53,90 @@ PREDICTION_DATA_DIR = SCRIPT_DIR / "prediction_data"
 
 # ============================================================================
 # MODULE SPECS
+#
+# Each module has one or more "historical" sources. Every historical source
+# that exists is concatenated and deduplicated on game_id to form the TRAIN
+# side. Any single source may be missing without breaking the script.
+#
+# - The convention *TRAIN.csv + *TEST.csv comes from the original training
+#   pipeline (where TEST was a holdout). Both are still useful as historical
+#   data because the season they held out is now in the past.
+#
+# - The `match_stats` module reads from big5_matches_fixed.csv-derived
+#   features. Because that file grows as new matches are scraped, the
+#   historical side grows automatically with it.
 # ============================================================================
 
 MODULE_SPECS = {
     "lineup": {
-        "train": TRAINING_FINAL_DATA_DIR / "lineup_embeddings_TRAIN.csv",
-        "test": TRAINING_FINAL_DATA_DIR / "lineup_embeddings_TEST.csv",
+        "historical": [
+            TRAINING_FINAL_DATA_DIR / "lineup_embeddings_TRAIN.csv",
+            TRAINING_FINAL_DATA_DIR / "lineup_embeddings_TEST.csv",
+        ],
         "upcoming": PREDICTION_DATA_DIR / "upcoming_lineup_embeddings.csv",
         "key": "game_id",
         "label_source": TRAINING_GOALS_SOURCE_PATH,
         "label_key": "game_id",
     },
     "player_stats": {
-        "train": TRAINING_FINAL_DATA_DIR / "player_statistics_pca_TRAIN.csv",
-        "test": TRAINING_FINAL_DATA_DIR / "player_statistics_pca_TEST.csv",
+        "historical": [
+            TRAINING_FINAL_DATA_DIR / "player_statistics_pca_TRAIN.csv",
+            TRAINING_FINAL_DATA_DIR / "player_statistics_pca_TEST.csv",
+        ],
         "upcoming": PREDICTION_DATA_DIR / "upcoming_player_statistics_pca.csv",
         "key": "game_id",
         "label_source": None,
         "label_key": None,
     },
     "skill_matchups": {
-        "train": TRAINING_FINAL_DATA_DIR / "skill_matchups_TRAIN.csv",
-        "test": TRAINING_FINAL_DATA_DIR / "skill_matchups_TEST.csv",
+        "historical": [
+            TRAINING_FINAL_DATA_DIR / "skill_matchups_TRAIN.csv",
+            TRAINING_FINAL_DATA_DIR / "skill_matchups_TEST.csv",
+        ],
         "upcoming": PREDICTION_DATA_DIR / "upcoming_skill_matchups.csv",
         "key": "game_id",
         "label_source": None,
         "label_key": None,
     },
     "match_stats": {
-        "train": TRAINING_FINAL_DATA_DIR / "match_statistics_pca_TRAIN.csv",
-        "test": TRAINING_FINAL_DATA_DIR / "match_statistics_pca_TEST.csv",
+        # match_statistics_pca_TRAIN / TEST are the two halves of the original
+        # historical split. They are concatenated here so the model always
+        # sees the full history. When a new run of the pipeline regenerates
+        # them, this script picks up the new rows automatically.
+        "historical": [
+            TRAINING_FINAL_DATA_DIR / "match_statistics_pca_TRAIN.csv",
+            TRAINING_FINAL_DATA_DIR / "match_statistics_pca_TEST.csv",
+        ],
         "upcoming": PREDICTION_DATA_DIR / "upcoming_match_stats_features.csv",
         "key": "game_id",
         "label_source": None,
         "label_key": None,
     },
     "league": {
-        "train": TRAINING_FINAL_DATA_DIR / "league_embeddings_TRAIN.csv",
-        "test": TRAINING_FINAL_DATA_DIR / "league_embeddings_TEST.csv",
+        "historical": [
+            TRAINING_FINAL_DATA_DIR / "league_embeddings_TRAIN.csv",
+            TRAINING_FINAL_DATA_DIR / "league_embeddings_TEST.csv",
+        ],
         "upcoming": PREDICTION_DATA_DIR / "upcoming_league_embeddings.csv",
         "key": "game_id",
         "label_source": None,
         "label_key": None,
     },
     "season": {
-        "train": TRAINING_FINAL_DATA_DIR / "season_embeddings_TRAIN.csv",
-        "test": TRAINING_FINAL_DATA_DIR / "season_embeddings_TEST.csv",
+        "historical": [
+            TRAINING_FINAL_DATA_DIR / "season_embeddings_TRAIN.csv",
+            TRAINING_FINAL_DATA_DIR / "season_embeddings_TEST.csv",
+        ],
         "upcoming": PREDICTION_DATA_DIR / "upcoming_season_embeddings.csv",
         "key": "game_id",
         "label_source": None,
         "label_key": None,
     },
     "matchup": {
-        "train": TRAINING_FINAL_DATA_DIR / "matchup_embeddings_TRAIN.csv",
-        "test": TRAINING_FINAL_DATA_DIR / "matchup_embeddings_TEST.csv",
+        "historical": [
+            TRAINING_FINAL_DATA_DIR / "matchup_embeddings_TRAIN.csv",
+            TRAINING_FINAL_DATA_DIR / "matchup_embeddings_TEST.csv",
+        ],
         "upcoming": PREDICTION_DATA_DIR / "upcoming_matchup_embeddings.csv",
         "key": "game_id",
         "label_source": None,
@@ -132,6 +159,33 @@ def _load_optional(path: Path) -> pd.DataFrame | None:
     if not path.exists():
         return None
     return pd.read_csv(path, low_memory=False)
+
+
+def _load_historical_concat(hist_paths: list[Path], key_col: str) -> pd.DataFrame | None:
+    """
+    Load every historical source that exists, concatenate them, and dedup on
+    the key column. Returns None if none of the paths exist.
+
+    Rows from earlier-listed paths win when a game_id appears in more than
+    one file (matches the previous behavior where *TRAIN came first).
+    """
+    frames = []
+    found = []
+    for p in hist_paths:
+        df = _load_optional(p)
+        if df is None:
+            continue
+        if key_col not in df.columns:
+            continue
+        frames.append(df)
+        found.append((p.name, len(df)))
+
+    if not frames:
+        return None
+
+    combined = pd.concat(frames, ignore_index=True)
+    combined = combined.drop_duplicates(subset=[key_col], keep="first")
+    return combined, found
 
 
 def _add_labels_if_needed(df: pd.DataFrame, spec: dict) -> pd.DataFrame:
@@ -203,7 +257,7 @@ def _clean_module(
     """
     Clean both TRAIN and TEST frames, then standardize.
 
-    train_df:   full historical data (all seasons up to and including 2025-2026)
+    train_df:   full historical data (everything scraped up to now)
     test_df:    upcoming fixtures (no HG/AG labels expected — filled with NaN)
     """
     required = {key_col}
@@ -213,7 +267,6 @@ def _clean_module(
     if key_col not in test_df.columns:
         raise KeyError(f"{module_name} TEST missing required key column '{key_col}'.")
 
-    # Ensure HG/AG columns exist in both frames (test may have none)
     for col in ["HG", "AG"]:
         if col not in train_df.columns:
             train_df = train_df.copy()
@@ -323,21 +376,16 @@ def main() -> None:
     for module_name, spec in MODULE_SPECS.items():
         print(f"\n[{module_name}]")
 
-        try:
-            hist_train = _load_frame(spec["train"])
-        except FileNotFoundError as e:
-            print(f"  ⚠ Skipping (historical train missing): {e}")
+        hist_paths = spec.get("historical", [])
+        loaded = _load_historical_concat(hist_paths, spec["key"])
+        if loaded is None:
+            print(f"  ⚠ Skipping (no historical source files exist).")
             continue
+        hist_full, found = loaded
 
-        hist_test = _load_optional(spec["test"])
-        if hist_test is not None:
-            hist_full = pd.concat([hist_train, hist_test], ignore_index=True)
-            hist_full = hist_full.drop_duplicates(subset=[spec["key"]], keep="first")
-            print(f"  Historical rows: {len(hist_train)} (TRAIN) + {len(hist_test)} (TEST) "
-                  f"→ {len(hist_full)} combined")
-        else:
-            hist_full = hist_train
-            print(f"  Historical rows: {len(hist_train)} (TRAIN only)")
+        for name, n in found:
+            print(f"  Historical source: {name:50s} {n:>7} rows")
+        print(f"  Historical rows combined (deduped): {len(hist_full)}")
 
         hist_full = _add_labels_if_needed(hist_full, spec)
 
