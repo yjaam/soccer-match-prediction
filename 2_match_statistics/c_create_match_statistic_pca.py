@@ -13,16 +13,27 @@ Feature filtering:
     This drops features that FBref stopped reporting in recent seasons,
     preventing the pipeline from relying on imputed historical means.
 
-After this historical transformation, the script imputes remaining gaps and
-saves the raw (non-PCA) features directly as the TRAIN/TEST datasets.
+After this historical transformation, the script imputes remaining gaps. With
+PERFORM_PCA = False the raw features are saved as the TRAIN/TEST datasets; with
+PERFORM_PCA = True a PCA fit on the training split reduces them first.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+
+
+# True: reduce the match statistics with PCA (fit on training data only).
+# False: save the raw imputed features; folder 4 then uses PCsInit for this module.
+PERFORM_PCA = False
+
+# Variance retained when PERFORM_PCA is True.
+PCA_VARIANCE_THRESHOLD = 0.95
 
 
 # Number of past side-specific matches used to compute pre-match means.
@@ -43,6 +54,21 @@ TRAIN_OUTPUT_PATH = FINAL_DATA_DIR / "match_statistics_pca_TRAIN.csv"
 TEST_OUTPUT_PATH = FINAL_DATA_DIR / "match_statistics_pca_TEST.csv"
 FEATURE_MATRIX_PATH = PROJECT_DIR / "data" / "match_statistics_before_pca.csv"
 TEST_FEATURE_MATRIX_PATH = PROJECT_DIR / "data" / "match_statistics_before_pca_TEST.csv"
+PCA_WEIGHTS_PATH = MISC_DIR / "match_statistics_pca_weights.json"
+
+# Tells folder 4 whether this module's inputs were already PCA-reduced (PCsInit is used if not).
+PCA_STATUS_PATH = MISC_DIR / "pca_status.json"
+
+
+def update_pca_status(module_name: str, pca_applied: bool) -> None:
+	status = {}
+	if PCA_STATUS_PATH.exists():
+		try:
+			status = json.loads(PCA_STATUS_PATH.read_text(encoding="utf-8"))
+		except json.JSONDecodeError:
+			status = {}
+	status[module_name] = {"pca_applied": bool(pca_applied)}
+	PCA_STATUS_PATH.write_text(json.dumps(status, indent=2), encoding="utf-8")
 
 
 EXCLUDE_EXACT = {
@@ -234,6 +260,45 @@ def team_mean_impute_with_reference(
 	return imputed, pd.DataFrame(missing_report)
 
 
+def pca_reduce(
+	train_matrix: pd.DataFrame,
+	test_matrix: pd.DataFrame,
+	variance_threshold: float,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
+	"""Standardise and project onto the leading principal components (fit on train only)."""
+
+	means = train_matrix.mean(axis=0)
+	stds = train_matrix.std(axis=0, ddof=0).replace(0, np.nan)
+
+	train_scaled = ((train_matrix - means) / stds).fillna(0.0).to_numpy(dtype=float)
+	test_scaled = ((test_matrix - means) / stds).fillna(0.0).to_numpy(dtype=float)
+
+	if train_scaled.shape[0] < 2:
+		raise ValueError("At least two training rows are required to fit PCA.")
+
+	_, singular_values, vt = np.linalg.svd(train_scaled, full_matrices=False)
+	variance = singular_values ** 2
+	total = variance.sum()
+	n_components = 1
+	if total > 0:
+		n_components = int(np.searchsorted(np.cumsum(variance) / total, variance_threshold)) + 1
+	n_components = min(n_components, vt.shape[0])
+	components = vt[:n_components]
+
+	columns = [f"match_stats_pc_{i + 1}" for i in range(n_components)]
+	train_scores = pd.DataFrame(train_scaled @ components.T, columns=columns)
+	test_scores = pd.DataFrame(test_scaled @ components.T, columns=columns)
+
+	weights = {
+		"feature_columns": list(train_matrix.columns),
+		"means": {c: float(means[c]) for c in train_matrix.columns},
+		"stds": {c: (float(stds[c]) if pd.notna(stds[c]) else 1.0) for c in train_matrix.columns},
+		"components": components.tolist(),
+		"explained_variance_ratio": (variance[:n_components] / total).tolist() if total > 0 else [],
+	}
+	return train_scores, test_scores, weights
+
+
 def split_train_test(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 	train_df = df[df["season"] != "2025-2026"].copy()
 	test_df = df[df["season"] == "2025-2026"].copy()
@@ -352,13 +417,23 @@ def main() -> None:
 	test_feature_matrix.to_csv(TEST_FEATURE_MATRIX_PATH, index=False)
 	missing_report.to_csv(MISC_DIR / "match_statistics_missingness_report.csv", index=False)
 
+	if PERFORM_PCA:
+		train_features_out, test_features_out, pca_weights = pca_reduce(
+			train_feature_matrix, test_feature_matrix, PCA_VARIANCE_THRESHOLD
+		)
+		PCA_WEIGHTS_PATH.write_text(json.dumps(pca_weights, indent=2), encoding="utf-8")
+		print(f"PCA reduced {len(feature_columns)} features to {train_features_out.shape[1]} components "
+		      f"(>= {PCA_VARIANCE_THRESHOLD:.0%} variance). Weights: {PCA_WEIGHTS_PATH}")
+	else:
+		train_features_out, test_features_out = train_feature_matrix, test_feature_matrix
+
 	train_output_df = pd.concat(
 		[
 			train_df[["match_id"]].reset_index(drop=True),
 			train_df[["game_id"]].reset_index(drop=True),
 			train_df[["Home_goals"]].rename(columns={"Home_goals": "HG"}).reset_index(drop=True),
 			train_df[["Away_goals"]].rename(columns={"Away_goals": "AG"}).reset_index(drop=True),
-			train_feature_matrix.reset_index(drop=True),
+			train_features_out.reset_index(drop=True),
 		],
 		axis=1,
 	)
@@ -368,19 +443,23 @@ def main() -> None:
 			test_df[["game_id"]].reset_index(drop=True),
 			test_df[["Home_goals"]].rename(columns={"Home_goals": "HG"}).reset_index(drop=True),
 			test_df[["Away_goals"]].rename(columns={"Away_goals": "AG"}).reset_index(drop=True),
-			test_feature_matrix.reset_index(drop=True),
+			test_features_out.reset_index(drop=True),
 		],
 		axis=1,
 	)
 
 	train_output_df.to_csv(TRAIN_OUTPUT_PATH, index=False)
 	test_output_df.to_csv(TEST_OUTPUT_PATH, index=False)
+	update_pca_status("match_stats", PERFORM_PCA)
 
 	print(f"\nSaved training dataset to {TRAIN_OUTPUT_PATH}")
 	print(f"Saved test dataset to {TEST_OUTPUT_PATH}")
 	print(f"Saved imputed training feature matrix to {FEATURE_MATRIX_PATH}")
 	print(f"Saved imputed test feature matrix to {TEST_FEATURE_MATRIX_PATH}")
-	print(f"Saved {len(feature_columns)} raw match-stat features (no PCA applied).")
+	if PERFORM_PCA:
+		print(f"Saved {train_features_out.shape[1]} PCA components (fit on training data).")
+	else:
+		print(f"Saved {len(feature_columns)} raw match-stat features (no PCA applied).")
 
 
 if __name__ == "__main__":

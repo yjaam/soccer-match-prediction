@@ -372,6 +372,30 @@ DEFAULT_CONFIG = {
     "spread_weight": 0.0,
     "target_std": 0.5,
 
+    # Goal-spread: hinge that keeps predicted rate spread (home, away, diff)
+    # at >= ratio * the spread of actual goals. Only a floor, so it is inactive
+    # once predictions are already bold enough. weight 0 disables it.
+    "goal_spread_weight": 1.0,
+    "goal_spread_ratio": 0.6,
+    "module_goal_spread_weight": 0.5,
+    "max_rate_logit": 2.0,         # caps lambda at prior * e^2 (about 10 goals)
+
+    # PCsInit: for modules whose upstream script did NOT apply PCA (nn_module_metadata
+    # pca_applied == False), a linear first layer is initialised with the training
+    # principal components, frozen for a few epochs, then fine-tuned.
+    "use_pcsinit": True,
+    "pcsinit_variance": 0.95,
+    "pcsinit_frozen_epochs": 10,
+    "pcsinit_activation": False,   # True = PCsInit-Act (ReLU after the PC layer)
+    "pcsinit_subset_fraction": 1.0,  # < 1.0 = PCsInit-Sub
+
+    # Fusion rates: convex blend of module rates, trained on out-of-fold module
+    # predictions (contiguous date blocks), shrunk toward the uniform average.
+    "fusion_oof_folds": 5,         # <= 1 falls back to in-sample module predictions
+    "blend_temperature": 1.0,      # init weights = softmax(-(module NLL - best) / T)
+    "blend_shrinkage": 1.0,
+    "blend_lr": 5e-3,
+
     # Decision
     "decision_source": "auto",     # auto | rate | classifier | blend
     "draw_margin_grid": {"start": 0.0, "stop": 2.0, "num": 201},
@@ -423,6 +447,12 @@ def load_config():
     else:
         user = {}
         print("[config] No config file found; using defaults.")
+
+    # The yaml groups some options in sections; the rest of CFG is flat.
+    for section_name in ("goal_prediction", "pcsinit", "fusion"):
+        section = user.pop(section_name, None)
+        if isinstance(section, dict):
+            user.update({k: v for k, v in section.items() if k in DEFAULT_CONFIG})
 
     merged = _deep_merge(DEFAULT_CONFIG, user)
     merged["draw_margin_grid"] = _expand_grid(merged["draw_margin_grid"])
@@ -529,6 +559,47 @@ def collate(batch):
     }
 
 
+def goal_spread_penalty(lam_h, lam_a, hg, ag, ratio):
+    """Hinge: predicted std of lambda_home, lambda_away and diff should be at
+    least `ratio` times the std of the actual targets in the batch."""
+    if lam_h.shape[0] < 2:
+        return lam_h.new_zeros(())
+    eps = 1e-6
+    pairs = [(lam_h, hg), (lam_a, ag), (lam_h - lam_a, hg - ag)]
+    total = lam_h.new_zeros(())
+    for pred, actual in pairs:
+        floor = ratio * actual.std().detach()
+        total = total + F.relu(floor - (pred.std() + eps)) ** 2
+    return total
+
+
+def pca_projection(train_matrix, variance_threshold=0.95, subset_fraction=1.0, seed=0):
+    """(r, d) array of leading principal directions; None if PCA is not possible."""
+    x = np.nan_to_num(np.asarray(train_matrix, dtype=float))
+    if 0.0 < subset_fraction < 1.0:
+        rng = np.random.default_rng(seed)
+        n_rows = max(2, int(len(x) * subset_fraction))
+        x = x[rng.choice(len(x), size=min(n_rows, len(x)), replace=False)]
+    if x.shape[0] < 2:
+        return None
+    x = x - x.mean(axis=0)
+    _, singular_values, vt = np.linalg.svd(x, full_matrices=False)
+    variance = singular_values ** 2
+    total = variance.sum()
+    if total <= 0:
+        return None
+    n_components = int(np.searchsorted(np.cumsum(variance) / total, variance_threshold)) + 1
+    return vt[: min(n_components, vt.shape[0])]
+
+
+def module_pca_applied(module_name):
+    """True/False as recorded by j_data_for_model.py; None if unknown."""
+    if not META_PATH.exists():
+        return None
+    meta = json.loads(META_PATH.read_text(encoding="utf-8"))
+    return meta.get("modules", {}).get(module_name, {}).get("pca_applied")
+
+
 # ============================================================================
 # PER-MODULE MLP
 # ============================================================================
@@ -540,16 +611,28 @@ class MLPRateModel(nn.Module):
     gradients still flow to earlier layers.
     """
     def __init__(self, input_dim, home_prior=1.35, away_prior=1.10,
-                 hidden1=64, hidden2=32, dropout=0.2):
+                 hidden1=64, hidden2=32, dropout=0.2, max_logit=2.0,
+                 pca_weights=None, pca_activation=False):
         super().__init__()
+        self.max_logit = max_logit
         self.register_buffer(
             "log_home_prior", torch.tensor(float(np.log(home_prior)))
         )
         self.register_buffer(
             "log_away_prior", torch.tensor(float(np.log(away_prior)))
         )
+        # PCsInit: linear layer with zero bias, initialised with principal directions.
+        self.pca_layer = None
+        trunk_in = input_dim
+        if pca_weights is not None:
+            self.pca_layer = nn.Linear(input_dim, pca_weights.shape[0])
+            with torch.no_grad():
+                self.pca_layer.weight.copy_(torch.as_tensor(pca_weights, dtype=torch.float32))
+                self.pca_layer.bias.zero_()
+            self.pca_act = nn.ReLU() if pca_activation else nn.Identity()
+            trunk_in = pca_weights.shape[0]
         self.trunk = nn.Sequential(
-            nn.Linear(input_dim, hidden1),
+            nn.Linear(trunk_in, hidden1),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(hidden1, hidden2),
@@ -560,44 +643,65 @@ class MLPRateModel(nn.Module):
         nn.init.normal_(self.head.weight, mean=0.0, std=1e-2)
         nn.init.zeros_(self.head.bias)
 
+    def set_pca_frozen(self, frozen):
+        if self.pca_layer is not None:
+            for p in self.pca_layer.parameters():
+                p.requires_grad_(not frozen)
+
     def forward(self, x):
+        if self.pca_layer is not None:
+            x = self.pca_act(self.pca_layer(x))
         h = self.trunk(x)
-        logits = self.head(h)
+        logits = self.head(h).clamp(-self.max_logit, self.max_logit)
         return (torch.exp(self.log_home_prior + logits[:, 0]),
                 torch.exp(self.log_away_prior + logits[:, 1]))
 
 
-def train_single_module(module_name, cfg, device):
-    """Train one MLP. Returns a dict with predictions on train and test."""
-    train_df_full, test_df, key_col, feature_cols = load_module_frames(module_name)
+def _scaled(df, feature_cols, mean, std):
+    out = df.copy()
+    out[feature_cols] = (out[feature_cols] - mean) / std
+    return out
 
-    # Inner split for early stopping
-    rng = np.random.default_rng(cfg.seed)
-    idx = rng.permutation(len(train_df_full))
-    n_val = int(len(train_df_full) * cfg.module_val_ratio)
-    val_idx, train_idx = idx[:n_val], idx[n_val:]
 
-    train_df = train_df_full.iloc[train_idx].reset_index(drop=True)
-    val_df = train_df_full.iloc[val_idx].reset_index(drop=True)
+def predict_module_frame(model, df, feature_cols, cfg, device):
+    ds = SimpleDataset(df, feature_cols)
+    loader = DataLoader(ds, batch_size=cfg.module_batch_size,
+                        shuffle=False, collate_fn=collate)
+    rows = []
+    model.eval()
+    with torch.no_grad():
+        for b in loader:
+            x = b["x"].to(device)
+            lh, la = model(x)
+            for i, gid in enumerate(b["game_id"]):
+                rows.append({
+                    "game_id": gid,
+                    "HG": float(b["HG"][i]),
+                    "AG": float(b["AG"][i]),
+                    "lambda_home": float(lh[i]),
+                    "lambda_away": float(la[i]),
+                })
+    return pd.DataFrame(rows)
 
-    # Standardize on train subset only
-    mean = train_df[feature_cols].mean()
-    std = train_df[feature_cols].std().replace(0, 1.0)
 
-    for df in (train_df, val_df, test_df):
+def fit_module_mlp(module_name, fit_df, val_df, feature_cols, cfg, device, verbose=True):
+    """Standardise on fit_df and train one MLP with early stopping on val_df.
+
+    Returns (model, feature_mean, feature_std, best_epoch, best_val_nll).
+    """
+    fit_df = fit_df.copy()
+    val_df = val_df.copy()
+
+    mean = fit_df[feature_cols].mean()
+    std = fit_df[feature_cols].std().replace(0, 1.0)
+    for df in (fit_df, val_df):
         df[feature_cols] = (df[feature_cols] - mean) / std
 
-    train_full_scaled = train_df_full.copy()
-    train_full_scaled[feature_cols] = (
-        (train_full_scaled[feature_cols] - mean) / std
-    )
+    home_prior = float(fit_df["HG"].mean())
+    away_prior = float(fit_df["AG"].mean())
 
-    home_prior = float(train_df["HG"].mean())
-    away_prior = float(train_df["AG"].mean())
-
-    train_ds = SimpleDataset(train_df, feature_cols)
+    train_ds = SimpleDataset(fit_df, feature_cols)
     val_ds = SimpleDataset(val_df, feature_cols)
-
     train_loader = DataLoader(train_ds, batch_size=cfg.module_batch_size,
                               shuffle=True, collate_fn=collate)
     val_loader = DataLoader(val_ds, batch_size=cfg.module_batch_size,
@@ -607,20 +711,40 @@ def train_single_module(module_name, cfg, device):
     h1 = cfg.module_hidden1 or min(cfg.module_hidden_cap, max(16, 2 * len(feature_cols)))
     h2 = cfg.module_hidden2 or max(8, h1 // 2)
 
+    pca_weights = None
+    if cfg.use_pcsinit and module_pca_applied(module_name) is False:
+        pca_weights = pca_projection(
+            fit_df[feature_cols].to_numpy(), cfg.pcsinit_variance,
+            cfg.pcsinit_subset_fraction, cfg.seed,
+        )
+
     model = MLPRateModel(
         len(feature_cols), home_prior, away_prior,
         hidden1=h1, hidden2=h2, dropout=cfg.module_dropout,
+        max_logit=cfg.max_rate_logit,
+        pca_weights=pca_weights, pca_activation=cfg.pcsinit_activation,
     ).to(device)
 
-    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"\n  [{module_name}] MLP: {len(feature_cols)}->{h1}->{h2}->2, "
-          f"params={n_params:,}, rows={len(train_ds)}")
+    if verbose:
+        n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        pcs_note = "" if pca_weights is None else f", PCsInit: {pca_weights.shape[0]} PCs"
+        print(f"\n  [{module_name}] MLP: {len(feature_cols)}->{h1}->{h2}->2, "
+              f"params={n_params:,}, rows={len(train_ds)}{pcs_note}")
 
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.module_lr,
                             weight_decay=cfg.module_weight_decay)
 
+    pcs_frozen = pca_weights is not None and cfg.pcsinit_frozen_epochs > 0
+    model.set_pca_frozen(pcs_frozen)
+
     best_val, best_state, best_epoch, no_imp = float("inf"), None, 0, 0
     for epoch in range(1, cfg.module_epochs + 1):
+        if pcs_frozen:
+            if epoch > cfg.pcsinit_frozen_epochs:
+                model.set_pca_frozen(False)
+                pcs_frozen = False
+            else:
+                no_imp = 0  # no early stopping while the PC layer is frozen
         model.train()
         for b in train_loader:
             x = b["x"].to(device)
@@ -630,6 +754,9 @@ def train_single_module(module_name, cfg, device):
             lh, la = model(x)
             loss = (F.poisson_nll_loss(lh, hg, log_input=False, full=True)
                     + F.poisson_nll_loss(la, ag, log_input=False, full=True))
+            if cfg.module_goal_spread_weight > 0:
+                loss = loss + cfg.module_goal_spread_weight * goal_spread_penalty(
+                    lh, la, hg, ag, cfg.goal_spread_ratio)
             loss.mean().backward()
             opt.step()
 
@@ -656,40 +783,74 @@ def train_single_module(module_name, cfg, device):
             if no_imp >= cfg.module_patience:
                 break
 
-        if cfg.verbose and (epoch % 10 == 0 or epoch == 1):
+        if verbose and cfg.verbose and (epoch % 10 == 0 or epoch == 1):
             print(f"    ep {epoch:03d} val_nll={v:.4f}")
 
     if best_state is not None:
         model.load_state_dict(best_state)
 
+    return model, mean, std, best_epoch, best_val
+
+
+def oof_module_predictions(module_name, train_df_full, feature_cols, cfg, device):
+    """Out-of-fold predictions for every historical row.
+
+    Folds are contiguous date blocks (game_id starts with YYYYMMDD), identical for
+    every module. Random folds leak across neighbouring matches and overstate
+    modules that memorise teams or form.
+    """
+    n_folds = cfg.fusion_oof_folds
+    dates = pd.to_numeric(train_df_full["game_id"].astype(str).str[:8], errors="coerce")
+    edges = dates.quantile(np.linspace(0, 1, n_folds + 1)[1:-1]).to_numpy()
+    fold_of_row = np.searchsorted(edges, dates.fillna(dates.max()).to_numpy(), side="right")
+
+    parts = []
+    for k in range(n_folds):
+        held = train_df_full[fold_of_row == k]
+        pool = train_df_full[fold_of_row != k]
+        order = np.random.default_rng(cfg.seed + k).permutation(len(pool))
+        n_val = int(len(pool) * cfg.module_val_ratio)
+        val_part = pool.iloc[order[:n_val]]
+        fit_part = pool.iloc[order[n_val:]]
+
+        model, mean, std, _, _ = fit_module_mlp(
+            module_name, fit_part, val_part, feature_cols, cfg, device, verbose=False
+        )
+        parts.append(predict_module_frame(
+            model, _scaled(held, feature_cols, mean, std), feature_cols, cfg, device))
+    return pd.concat(parts, ignore_index=True)
+
+
+def train_single_module(module_name, cfg, device):
+    """Train one MLP. Returns a dict with predictions on train, out-of-fold and test."""
+    train_df_full, test_df, key_col, feature_cols = load_module_frames(module_name)
+
+    # Inner split for early stopping
+    rng = np.random.default_rng(cfg.seed)
+    idx = rng.permutation(len(train_df_full))
+    n_val = int(len(train_df_full) * cfg.module_val_ratio)
+    val_df = train_df_full.iloc[idx[:n_val]].reset_index(drop=True)
+    train_df = train_df_full.iloc[idx[n_val:]].reset_index(drop=True)
+
+    model, mean, std, best_epoch, best_val = fit_module_mlp(
+        module_name, train_df, val_df, feature_cols, cfg, device
+    )
     print(f"  [{module_name}] best_epoch={best_epoch}  val_nll={best_val:.4f}")
 
-    # Predict on full train + test
-    def _predict(df):
-        ds = SimpleDataset(df, feature_cols)
-        loader = DataLoader(ds, batch_size=cfg.module_batch_size,
-                            shuffle=False, collate_fn=collate)
-        rows = []
-        model.eval()
-        with torch.no_grad():
-            for b in loader:
-                x = b["x"].to(device)
-                lh, la = model(x)
-                for i, gid in enumerate(b["game_id"]):
-                    rows.append({
-                        "game_id": gid,
-                        "HG": float(b["HG"][i]),
-                        "AG": float(b["AG"][i]),
-                        "lambda_home": float(lh[i]),
-                        "lambda_away": float(la[i]),
-                    })
-        return pd.DataFrame(rows)
+    oof_pred = None
+    if cfg.fusion_oof_folds > 1:
+        oof_pred = oof_module_predictions(module_name, train_df_full, feature_cols, cfg, device)
+        print(f"  [{module_name}] {len(oof_pred)} out-of-fold predictions "
+              f"({cfg.fusion_oof_folds} folds)")
 
     return {
         "model_state": model.state_dict(),
         "feature_cols": feature_cols,
-        "train_pred": _predict(train_full_scaled),
-        "test_pred": _predict(test_df),
+        "train_pred": predict_module_frame(
+            model, _scaled(train_df_full, feature_cols, mean, std), feature_cols, cfg, device),
+        "oof_pred": oof_pred,
+        "test_pred": predict_module_frame(
+            model, _scaled(test_df, feature_cols, mean, std), feature_cols, cfg, device),
     }
 
 
@@ -698,16 +859,22 @@ def train_single_module(module_name, cfg, device):
 # ============================================================================
 
 class LSTMFusion(nn.Module):
-    """LSTM over the ordered sequence of module predictions.
+    """Fusion over the ordered sequence of module predictions.
 
     Each module contributes one timestep of shape (3,):
         (lambda_home, lambda_away, diff)
     where diff = lambda_home - lambda_away.
+
+    Goal rates: convex (softmax-weighted) geometric blend of the module rates, so the
+    fusion can never be bolder than its inputs and a module that only looks good on
+    in-distribution rows cannot be amplified on the shifted upcoming fixtures.
+    Outcome logits: LSTM over the module sequence.
     """
     def __init__(self, n_modules, home_prior=1.35, away_prior=1.10,
                  hidden=32, num_layers=1, dropout=0.3,
-                 outcome_head_hidden=32):
+                 outcome_head_hidden=32, max_logit=2.0, init_weights=None):
         super().__init__()
+        self.max_logit = max_logit
         self.register_buffer(
             "log_home_prior", torch.tensor(float(np.log(home_prior)))
         )
@@ -725,9 +892,11 @@ class LSTMFusion(nn.Module):
         )
         self.input_dropout = nn.Dropout(dropout)
 
-        self.rate_head = nn.Linear(hidden, 2)
-        nn.init.normal_(self.rate_head.weight, mean=0.0, std=1e-2)
-        nn.init.zeros_(self.rate_head.bias)
+        if init_weights is None:
+            init_weights = np.full(n_modules, 1.0 / n_modules)
+        theta = torch.log(torch.as_tensor(init_weights, dtype=torch.float32).clamp(min=1e-6))
+        self.theta_home = nn.Parameter(theta.clone())
+        self.theta_away = nn.Parameter(theta.clone())
 
         self.outcome_head = nn.Sequential(
             nn.Linear(hidden, outcome_head_hidden),
@@ -736,16 +905,30 @@ class LSTMFusion(nn.Module):
             nn.Linear(outcome_head_hidden, 3),
         )
 
+    def blend_weights(self):
+        return (torch.softmax(self.theta_home, dim=0),
+                torch.softmax(self.theta_away, dim=0))
+
+    def shrinkage(self):
+        """Squared distance of the blend weights from the uniform blend."""
+        uniform = 1.0 / self.n_modules
+        w_h, w_a = self.blend_weights()
+        return ((w_h - uniform) ** 2).sum() + ((w_a - uniform) ** 2).sum()
+
     def forward(self, x):
         B = x.shape[0]
         seq = x.view(B, self.n_modules, 3)
+        w_h, w_a = self.blend_weights()
+        log_h = torch.log(seq[:, :, 0].clamp_min(1e-6)) - self.log_home_prior
+        log_a = torch.log(seq[:, :, 1].clamp_min(1e-6)) - self.log_away_prior
+        rate_h = (log_h * w_h).sum(dim=1).clamp(-self.max_logit, self.max_logit)
+        rate_a = (log_a * w_a).sum(dim=1).clamp(-self.max_logit, self.max_logit)
+        lam_h = torch.exp(self.log_home_prior + rate_h)
+        lam_a = torch.exp(self.log_away_prior + rate_a)
+
         seq = self.input_dropout(seq)
         _, (h_n, _) = self.lstm(seq)
-        h = h_n[-1]
-        rate_logits = self.rate_head(h)
-        lam_h = torch.exp(self.log_home_prior + rate_logits[:, 0])
-        lam_a = torch.exp(self.log_away_prior + rate_logits[:, 1])
-        outcome_logits = self.outcome_head(h)
+        outcome_logits = self.outcome_head(h_n[-1])
         return lam_h, lam_a, outcome_logits
 
 
@@ -795,9 +978,13 @@ def compute_class_weights(outcome, use_full=True):
 
 def combined_loss(lam_h, lam_a, logits, hg, ag, outcome,
                   outcome_weight, class_weights, spread_weight=0.0,
-                  target_std=0.5):
+                  target_std=0.5, goal_spread_weight=0.0,
+                  goal_spread_ratio=0.6):
     poisson = F.poisson_nll_loss(lam_h, hg, log_input=False, full=True) + \
               F.poisson_nll_loss(lam_a, ag, log_input=False, full=True)
+    if goal_spread_weight > 0:
+        poisson = poisson + goal_spread_weight * goal_spread_penalty(
+            lam_h, lam_a, hg, ag, goal_spread_ratio)
 
     if class_weights is not None and class_weights[1].item() == 0.0:
         mask = outcome != 1
@@ -929,7 +1116,8 @@ def train_dashboard():
     # ------------------------------------------------------------------
     # Phase 2: build fusion frames
     # ------------------------------------------------------------------
-    train_pred_map = {mn: r["train_pred"] for mn, r in module_results.items()}
+    train_pred_map = {mn: (r["oof_pred"] if r["oof_pred"] is not None else r["train_pred"])
+                      for mn, r in module_results.items()}
     test_pred_map = {mn: r["test_pred"] for mn, r in module_results.items()}
 
     fusion_train_full, feature_cols = build_fusion_frame(train_pred_map, CFG.modules)
@@ -948,16 +1136,28 @@ def train_dashboard():
     print("PHASE 3: LSTM FUSION")
     print("=" * 78)
 
-    # Split fusion train / val
-    rng = np.random.default_rng(CFG.seed)
-    idx = rng.permutation(len(fusion_train_full))
+    # Split fusion train / val: the most recent rows validate, as upcoming fixtures are the future.
+    fusion_train_full = fusion_train_full.sort_values("game_id").reset_index(drop=True)
     n_val = int(len(fusion_train_full) * CFG.val_fraction)
-    val_idx, train_idx = idx[:n_val], idx[n_val:]
-    fusion_train = fusion_train_full.iloc[train_idx].reset_index(drop=True)
-    fusion_val = fusion_train_full.iloc[val_idx].reset_index(drop=True)
+    fusion_train = fusion_train_full.iloc[:len(fusion_train_full) - n_val].reset_index(drop=True)
+    fusion_val = fusion_train_full.iloc[len(fusion_train_full) - n_val:].reset_index(drop=True)
 
     home_prior = float(fusion_train["HG"].mean())
     away_prior = float(fusion_train["AG"].mean())
+
+    # Blend weights start from per-module NLL on the validation rows.
+    hg_t = torch.tensor(fusion_val["HG"].to_numpy(), dtype=torch.float32)
+    ag_t = torch.tensor(fusion_val["AG"].to_numpy(), dtype=torch.float32)
+    module_nll = []
+    for mn in CFG.modules:
+        lh_t = torch.tensor(fusion_val[f"{mn}_lh"].to_numpy(), dtype=torch.float32)
+        la_t = torch.tensor(fusion_val[f"{mn}_la"].to_numpy(), dtype=torch.float32)
+        module_nll.append(float(
+            F.poisson_nll_loss(lh_t, hg_t, log_input=False, full=True)
+            + F.poisson_nll_loss(la_t, ag_t, log_input=False, full=True)))
+    module_nll = np.array(module_nll)
+    init_weights = np.exp(-(module_nll - module_nll.min()) / CFG.blend_temperature)
+    init_weights = init_weights / init_weights.sum()
 
     train_ds = FusionDataset(fusion_train, feature_cols)
     val_ds = FusionDataset(fusion_val, feature_cols)
@@ -977,6 +1177,8 @@ def train_dashboard():
         num_layers=CFG.lstm_layers,
         dropout=CFG.lstm_dropout,
         outcome_head_hidden=CFG.lstm_outcome_head_hidden,
+        max_logit=CFG.max_rate_logit,
+        init_weights=init_weights,
     ).to(device)
 
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -1004,8 +1206,14 @@ def train_dashboard():
         decision_source = "rate" if draw_disabled else "classifier"
     print(f"  Decision source: {decision_source}")
 
-    opt = torch.optim.AdamW(model.parameters(), lr=CFG.lstm_lr,
-                            weight_decay=CFG.lstm_weight_decay)
+    # Blend weights are not weight-decayed and learn faster than the LSTM.
+    blend_params = [model.theta_home, model.theta_away]
+    other_params = [p for n, p in model.named_parameters()
+                    if n not in ("theta_home", "theta_away")]
+    opt = torch.optim.AdamW(
+        [{"params": other_params},
+         {"params": blend_params, "lr": CFG.blend_lr, "weight_decay": 0.0}],
+        lr=CFG.lstm_lr, weight_decay=CFG.lstm_weight_decay)
     sched = torch.optim.lr_scheduler.ReduceLROnPlateau(
         opt, mode="min", factor=0.5, patience=5, min_lr=1e-6,
     )
@@ -1025,8 +1233,11 @@ def train_dashboard():
             loss = combined_loss(lh, la, logits, hg, ag, oc_t,
                                  CFG.outcome_weight, class_weights,
                                  spread_weight=CFG.spread_weight,
-                                 target_std=CFG.target_std)
-            loss.mean().backward()
+                                 target_std=CFG.target_std,
+                                 goal_spread_weight=CFG.goal_spread_weight,
+                                 goal_spread_ratio=CFG.goal_spread_ratio)
+            loss = loss.mean() + CFG.blend_shrinkage * model.shrinkage()
+            loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
             opt.step()
 
@@ -1083,6 +1294,10 @@ def train_dashboard():
     if best_state is not None:
         model.load_state_dict(best_state)
         print(f"  ✓ Best model from epoch {best_epoch}")
+
+    blend_w_home = model.blend_weights()[0].detach().cpu().numpy()
+    print("  Blend weights (home): "
+          + ", ".join(f"{mn}={w:.2f}" for mn, w in zip(CFG.modules, blend_w_home)))
 
     # ------------------------------------------------------------------
     # Phase 4: final evaluation on validation and test

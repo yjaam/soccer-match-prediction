@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""BASELINE: MLP modules + LSTM / matchup-prior fusion.
+"""Longitudinal LSTM modules + fusion.
 
 Pipeline
 --------
-1. Train one small MLP per module. Each predicts (lambda_home, lambda_away).
+0. Run a2_prepare_lstm_data.py first: it derives final_data/lstm_input_<module>_*.csv,
+   where every game carries its current features plus 5 history sequences
+   (home/away form, home/away season, head-to-head) built from earlier games.
+1. Train one LSTM per module. Each runs over the history sequences, combines them
+   with the current-game features and predicts (lambda_home, lambda_away).
 2. Combine the module predictions with a fusion model. Styles:
 
    "mlp"                 - MLP over the concatenated module predictions.
@@ -48,7 +52,7 @@ FINAL_DATA_DIR = PROJECT_DIR / "final_data"
 RESULT_DATA_DIR = PROJECT_DIR / "result_data"
 MISC_DIR = PROJECT_DIR / "misc"
 
-META_PATH = MISC_DIR / "nn_module_metadata.json"
+META_PATH = MISC_DIR / "lstm_module_metadata.json"
 BASELINE_SUMMARY_PATH = RESULT_DATA_DIR / "lstm_fusion_summary.json"
 BASELINE_MODEL_PATH = RESULT_DATA_DIR / "lstm_fusion_model.pt"
 BASELINE_PRED_PATH = RESULT_DATA_DIR / "lstm_fusion_predictions.csv"
@@ -68,10 +72,11 @@ class BaselineConfig:
     patience: int = 15
     max_goals: int = 12
 
-    # --- Per-module MLP architecture -----------------------------------
-    module_hidden1: int = 0        # 0 = auto: min(cap, max(16, 2*d))
-    module_hidden2: int = 0        # 0 = auto: max(8, h1//2)
-    module_hidden_cap: int = 64    # cap on the auto-sized first hidden layer
+    # --- Per-module longitudinal LSTM -----------------------------------
+    seq_proj: int = 24             # shared per-step encoder width
+    seq_hidden: int = 24           # LSTM hidden size, one LSTM per history series
+    seq_layers: int = 1
+    cur_hidden: int = 24           # encoder width for the current-game features
     module_dropout: float = 0.3
 
     # --- Fusion: which modules and which style --------------------------
@@ -79,8 +84,24 @@ class BaselineConfig:
     fusion_modules: tuple = (
         "matchup", "lineup", "player_stats", "skill_matchups", "match_stats", "season"
     )
-    fusion_style: str = "matchup_prior_lstm"
-    # "mlp" | "lstm" | "matchup_prior_mlp" | "matchup_prior_lstm"
+    fusion_style: str = "weighted_blend"
+    # "weighted_blend" | "mlp" | "lstm" | "matchup_prior_mlp" | "matchup_prior_lstm"
+
+    # --- Out-of-fold module predictions for fusion training -------------
+    # The fusion is fit on K-fold out-of-fold module predictions so it sees the
+    # modules' real generalisation quality instead of their overfit train fits.
+    # <= 1 falls back to in-sample predictions.
+    fusion_oof_folds: int = 5
+
+    # --- weighted_blend fusion -----------------------------------------
+    blend_temperature: float = 1.0     # init weights = softmax(-(module NLL - best NLL) / T); large T = uniform
+    # Pull the blend toward the uniform average. Module quality measured on training-side
+    # rows can overstate modules whose train/test inputs differ (e.g. embeddings), and a
+    # uniform geometric mean is a robust fallback that rarely loses to the best module.
+    blend_shrinkage: float = 1.0
+    blend_lr: float = 5e-3             # learning rate of the blend weights
+    blend_residual_hidden: int = 0     # >0 adds a small non-linear correction (risky under shift)
+    blend_residual_scale: float = 0.3  # residual is tanh-bounded to +-scale in log-rate
 
     # --- MLP fusion hyperparameters ------------------------------------
     fusion_hidden: int = 16
@@ -104,7 +125,7 @@ class BaselineConfig:
 
 class SimpleDataset(Dataset):
     def __init__(self, frame, feature_cols):
-        self.x = torch.tensor(frame[feature_cols].astype(float).values, dtype=torch.float32)
+        self.x = torch.from_numpy(frame[feature_cols].to_numpy(dtype=np.float32))
         self.hg = torch.tensor(frame["HG"].astype(float).values, dtype=torch.float32)
         self.ag = torch.tensor(frame["AG"].astype(float).values, dtype=torch.float32)
         self.game_id = frame["game_id"].astype(str).values
@@ -166,32 +187,49 @@ def collate_simple_batch(batch):
 # PER-MODULE MODEL
 # ============================================================================
 
-class MLPRateModel(nn.Module):
-    """MLP rate model: log(lambda) = log(prior) + head(trunk(x))."""
-    def __init__(self, input_dim, home_prior=1.35, away_prior=1.10,
-                 hidden1=64, hidden2=32, dropout=0.2):
+class SequenceRateModel(nn.Module):
+    """Longitudinal rate model: log(lambda) = log(prior) + head([current, LSTM(series)...]).
+
+    The flat input is [current features | n_series * seq_len * step_dim]. A shared linear
+    encoder embeds every step (padded steps are masked via the last step dim, `valid`);
+    one LSTM per series reads its steps oldest -> newest.
+    """
+    def __init__(self, n_current, n_series, seq_len, step_dim,
+                 home_prior=1.35, away_prior=1.10,
+                 proj=24, hidden=24, num_layers=1, cur_hidden=24, dropout=0.3):
         super().__init__()
+        self.n_current, self.n_series = n_current, n_series
+        self.seq_len, self.step_dim = seq_len, step_dim
         self.register_buffer(
             "log_home_prior", torch.tensor(float(np.log(home_prior)))
         )
         self.register_buffer(
             "log_away_prior", torch.tensor(float(np.log(away_prior)))
         )
-        self.trunk = nn.Sequential(
-            nn.Linear(input_dim, hidden1),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(hidden1, hidden2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
+        self.step_enc = nn.Sequential(nn.Linear(step_dim, proj), nn.ReLU(), nn.Dropout(dropout))
+        self.lstms = nn.ModuleList([
+            nn.LSTM(proj, hidden, num_layers=num_layers, batch_first=True,
+                    dropout=dropout if num_layers > 1 else 0.0)
+            for _ in range(n_series)
+        ])
+        self.cur_enc = nn.Sequential(
+            nn.Linear(n_current, cur_hidden), nn.ReLU(), nn.Dropout(dropout),
         )
-        self.head = nn.Linear(hidden2, 2)
+        self.head = nn.Linear(cur_hidden + n_series * hidden, 2)
         nn.init.normal_(self.head.weight, mean=0.0, std=1e-2)
         nn.init.zeros_(self.head.bias)
 
     def forward(self, x):
-        h = self.trunk(x)
-        logits = self.head(h)
+        B = x.shape[0]
+        cur = x[:, :self.n_current]
+        seq = x[:, self.n_current:].reshape(B, self.n_series, self.seq_len, self.step_dim)
+        valid = seq[..., -1:]
+        feats = [self.cur_enc(cur)]
+        for s, lstm in enumerate(self.lstms):
+            steps = self.step_enc(seq[:, s]) * valid[:, s]
+            _, (h_n, _) = lstm(steps)
+            feats.append(h_n[-1])
+        logits = self.head(torch.cat(feats, dim=1))
         return (torch.exp(self.log_home_prior + logits[:, 0]),
                 torch.exp(self.log_away_prior + logits[:, 1]))
 
@@ -199,6 +237,57 @@ class MLPRateModel(nn.Module):
 # ============================================================================
 # FUSION MODELS
 # ============================================================================
+
+class WeightedBlendFusionModel(nn.Module):
+    """Convex (softmax-weighted) geometric blend of the module rates.
+
+    log(lambda) = sum_m w_m * log(lambda_m) [+ small bounded residual], w >= 0, sum w = 1.
+    The blend can never be bolder than its inputs, so a module that looks too good on
+    in-distribution rows cannot be amplified on the shifted test season. Weights start
+    from out-of-fold module quality and can shift fully onto the best module.
+    """
+    def __init__(self, n_modules, init_weights, home_prior=1.35, away_prior=1.10,
+                 hidden=0, dropout=0.3, residual_scale=0.3):
+        super().__init__()
+        self.n_modules = n_modules
+        self.residual_scale = residual_scale
+        self.register_buffer(
+            "log_home_prior", torch.tensor(float(np.log(home_prior)))
+        )
+        self.register_buffer(
+            "log_away_prior", torch.tensor(float(np.log(away_prior)))
+        )
+        theta = torch.log(torch.as_tensor(init_weights, dtype=torch.float32).clamp(min=1e-6))
+        self.theta_home = nn.Parameter(theta.clone())
+        self.theta_away = nn.Parameter(theta.clone())
+        self.residual = None
+        if hidden > 0:
+            self.residual = nn.Sequential(
+                nn.Linear(2 * n_modules, hidden), nn.ReLU(), nn.Dropout(dropout),
+                nn.Linear(hidden, 2),
+            )
+            nn.init.zeros_(self.residual[-1].weight)
+            nn.init.zeros_(self.residual[-1].bias)
+
+    def shrinkage(self):
+        """Squared distance of the blend weights from the uniform blend."""
+        uniform = 1.0 / self.n_modules
+        return ((torch.softmax(self.theta_home, dim=0) - uniform) ** 2).sum() + \
+               ((torch.softmax(self.theta_away, dim=0) - uniform) ** 2).sum()
+
+    def forward(self, x):
+        seq = x.view(x.shape[0], self.n_modules, 3)
+        log_h = torch.log(seq[:, :, 0].clamp(min=1e-6)) - self.log_home_prior
+        log_a = torch.log(seq[:, :, 1].clamp(min=1e-6)) - self.log_away_prior
+        out_h = (log_h * torch.softmax(self.theta_home, dim=0)).sum(dim=1)
+        out_a = (log_a * torch.softmax(self.theta_away, dim=0)).sum(dim=1)
+        if self.residual is not None:
+            res = torch.tanh(self.residual(torch.cat([log_h, log_a], dim=1))) * self.residual_scale
+            out_h = out_h + res[:, 0]
+            out_a = out_a + res[:, 1]
+        return (torch.exp(self.log_home_prior + out_h),
+                torch.exp(self.log_away_prior + out_a))
+
 
 class MLPFusionModel(nn.Module):
     """Concatenate module (lambda_h, lambda_a, diff) and predict final rates."""
@@ -440,13 +529,15 @@ def load_module_frames(module_name):
     key_col = module_meta["key_col"]
     feature_cols = module_meta["feature_cols"]
 
-    train_path = FINAL_DATA_DIR / f"nn_input_{module_name}_TRAIN.csv"
-    test_path = FINAL_DATA_DIR / f"nn_input_{module_name}_TEST.csv"
+    train_path = FINAL_DATA_DIR / f"lstm_input_{module_name}_TRAIN.csv"
+    test_path = FINAL_DATA_DIR / f"lstm_input_{module_name}_TEST.csv"
     if not train_path.exists() or not test_path.exists():
         raise FileNotFoundError(f"Missing prepared inputs for {module_name}.")
 
-    train_df = pd.read_csv(train_path, low_memory=False)
-    test_df = pd.read_csv(test_path, low_memory=False)
+    cols = pd.read_csv(train_path, nrows=0).columns
+    dtypes = {c: np.float32 for c in cols if c != key_col}
+    train_df = pd.read_csv(train_path, dtype=dtypes)
+    test_df = pd.read_csv(test_path, dtype=dtypes)
 
     for df in (train_df, test_df):
         df[feature_cols] = df[feature_cols].fillna(0.0)
@@ -479,55 +570,35 @@ def predict_frame(model, df, feature_cols, config, device):
 # TRAINING — SINGLE MODULE
 # ============================================================================
 
-def train_single_module(module_name, config, device):
-    train_df_full, test_df, key_col, feature_cols = load_module_frames(module_name)
+def fit_module_lstm(module_name, fit_df, val_df, feature_cols, config, device, verbose=True):
+    """Train one longitudinal LSTM with early stopping on val_df.
 
-    rng = np.random.default_rng(config.seed)
-    indices = rng.permutation(len(train_df_full))
-    n_val = int(len(train_df_full) * config.val_ratio)
-    val_idx = indices[:n_val]
-    train_idx = indices[n_val:]
+    Inputs are already standardised upstream (a_prepare_data / a2_prepare_lstm_data).
+    Returns (model, best_epoch).
+    """
+    meta = load_module_meta(module_name)
+    home_prior = float(fit_df["HG"].mean())
+    away_prior = float(fit_df["AG"].mean())
 
-    train_df = train_df_full.iloc[train_idx].reset_index(drop=True)
-    val_df = train_df_full.iloc[val_idx].reset_index(drop=True)
-
-    mean = train_df[feature_cols].mean()
-    std = train_df[feature_cols].std().replace(0, 1.0)
-
-    for df in (train_df, val_df, test_df):
-        df[feature_cols] = (df[feature_cols] - mean) / std
-
-    train_full_scaled = train_df_full.copy()
-    train_full_scaled[feature_cols] = (train_full_scaled[feature_cols] - mean) / std
-
-    home_prior = float(train_df["HG"].mean())
-    away_prior = float(train_df["AG"].mean())
-
-    train_ds = SimpleDataset(train_df, feature_cols)
+    train_ds = SimpleDataset(fit_df, feature_cols)
     val_ds = SimpleDataset(val_df, feature_cols)
-    test_ds = SimpleDataset(test_df, feature_cols)
-
     train_loader = DataLoader(train_ds, batch_size=config.batch_size, shuffle=True,
                               collate_fn=collate_simple_batch)
     val_loader = DataLoader(val_ds, batch_size=config.batch_size, shuffle=False,
                             collate_fn=collate_simple_batch)
-    test_loader = DataLoader(test_ds, batch_size=config.batch_size, shuffle=False,
-                             collate_fn=collate_simple_batch)
 
-    h1 = config.module_hidden1 or min(
-        config.module_hidden_cap, max(16, 2 * len(feature_cols))
-    )
-    h2 = config.module_hidden2 or max(8, h1 // 2)
-
-    model = MLPRateModel(
-        len(feature_cols), home_prior, away_prior,
-        hidden1=h1, hidden2=h2, dropout=config.module_dropout,
+    model = SequenceRateModel(
+        meta["n_current"], meta["n_series"], meta["seq_len"], meta["step_dim"],
+        home_prior, away_prior,
+        proj=config.seq_proj, hidden=config.seq_hidden, num_layers=config.seq_layers,
+        cur_hidden=config.cur_hidden, dropout=config.module_dropout,
     ).to(device)
 
-    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"\n  [{module_name}] Training (Features: {len(feature_cols)}, "
-          f"Rows: {len(train_ds)}, MLP: {len(feature_cols)}->{h1}->{h2}->2, "
-          f"Params: {n_params:,})")
+    if verbose:
+        n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"\n  [{module_name}] Training (Current feats: {meta['n_current']}, "
+              f"Series: {meta['n_series']}x{meta['seq_len']}x{meta['step_dim']}, "
+              f"Rows: {len(train_ds)}, Params: {n_params:,})")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate,
                                   weight_decay=config.weight_decay)
@@ -561,10 +632,11 @@ def train_single_module(module_name, config, device):
             patience_counter += 1
 
         if patience_counter >= config.patience:
-            print(f"    Early stopping at epoch {epoch}")
+            if verbose:
+                print(f"    Early stopping at epoch {epoch}")
             break
 
-        if epoch % 10 == 0 or epoch == 1:
+        if verbose and (epoch % 10 == 0 or epoch == 1):
             print(f"    Ep {epoch:03d} | Val Loss {val_m['loss']:.4f} | "
                   f"Acc {val_m['accuracy']:.3f} | "
                   f"std(λh) {val_m['std_home_rate']:.4f}")
@@ -572,30 +644,85 @@ def train_single_module(module_name, config, device):
     if best_state is not None:
         model.load_state_dict(best_state)
 
+    return model, best_epoch
+
+
+def oof_module_predictions(module_name, train_df_full, feature_cols, config, device):
+    """Out-of-fold predictions for every training row.
+
+    Folds are contiguous date blocks (game_id starts with YYYYMMDD), the same for every
+    module. Random folds leak across neighbouring matches and overstate modules that
+    memorise teams or form, which then get over-weighted on the future test season.
+    """
+    n_folds = config.fusion_oof_folds
+    dates = pd.to_numeric(train_df_full["game_id"].astype(str).str[:8], errors="coerce")
+    edges = dates.quantile(np.linspace(0, 1, n_folds + 1)[1:-1]).to_numpy()
+    fold_of_row = np.searchsorted(edges, dates.fillna(dates.max()).to_numpy(), side="right")
+
+    parts = []
+    for k in range(n_folds):
+        held = train_df_full[fold_of_row == k]
+        pool = train_df_full[fold_of_row != k]
+        order = np.random.default_rng(config.seed + k).permutation(len(pool))
+        n_val = int(len(pool) * config.val_ratio)
+        val_part = pool.iloc[order[:n_val]]
+        fit_part = pool.iloc[order[n_val:]]
+
+        model, _ = fit_module_lstm(
+            module_name, fit_part, val_part, feature_cols, config, device, verbose=False
+        )
+        parts.append(predict_frame(model, held, feature_cols, config, device))
+    return pd.concat(parts, ignore_index=True)
+
+
+def train_single_module(module_name, config, device):
+    train_df_full, test_df, key_col, feature_cols = load_module_frames(module_name)
+
+    rng = np.random.default_rng(config.seed)
+    indices = rng.permutation(len(train_df_full))
+    n_val = int(len(train_df_full) * config.val_ratio)
+    val_df = train_df_full.iloc[indices[:n_val]].reset_index(drop=True)
+    train_df = train_df_full.iloc[indices[n_val:]].reset_index(drop=True)
+
+    model, best_epoch = fit_module_lstm(
+        module_name, train_df, val_df, feature_cols, config, device
+    )
+
+    test_ds = SimpleDataset(test_df, feature_cols)
+    test_loader = DataLoader(test_ds, batch_size=config.batch_size, shuffle=False,
+                             collate_fn=collate_simple_batch)
+
     test_m = compute_metrics(model, test_loader, device, config.max_goals)
     print(f"  [{module_name}] Test | Loss {test_m['loss']:.4f} | "
           f"Acc {test_m['accuracy']:.3f} | std(λh) {test_m['std_home_rate']:.4f}")
 
-    model_path = RESULT_DATA_DIR / f"baseline_mlp_{module_name}_model.pt"
+    model_path = RESULT_DATA_DIR / f"lstm_module_{module_name}_model.pt"
     torch.save({
         "state_dict": model.state_dict(),
         "module_name": module_name,
         "best_epoch": best_epoch,
-        "feature_mean": mean.to_dict(),
-        "feature_std": std.to_dict(),
     }, model_path)
 
-    train_pred = predict_frame(model, train_full_scaled, feature_cols, config, device)
+    train_pred = predict_frame(model, train_df_full, feature_cols, config, device)
     test_pred = predict_frame(model, test_df, feature_cols, config, device)
 
     train_pred.to_csv(
-        RESULT_DATA_DIR / f"baseline_mlp_{module_name}_train_predictions.csv",
+        RESULT_DATA_DIR / f"lstm_module_{module_name}_train_predictions.csv",
         index=False,
     )
     test_pred.to_csv(
-        RESULT_DATA_DIR / f"baseline_mlp_{module_name}_predictions.csv",
+        RESULT_DATA_DIR / f"lstm_module_{module_name}_predictions.csv",
         index=False,
     )
+
+    oof_path = RESULT_DATA_DIR / f"lstm_module_{module_name}_oof_predictions.csv"
+    if config.fusion_oof_folds > 1:
+        oof = oof_module_predictions(module_name, train_df_full, feature_cols, config, device)
+        oof.to_csv(oof_path, index=False)
+        print(f"  [{module_name}] Saved {len(oof)} out-of-fold predictions "
+              f"({config.fusion_oof_folds} folds)")
+    else:
+        oof_path.unlink(missing_ok=True)  # never let a stale OOF file reach the fusion
 
     return model, test_ds, best_epoch, test_m
 
@@ -609,9 +736,11 @@ def build_fusion_frame(split, fusion_modules):
     dfs = []
     for mn in fusion_modules:
         if split == "train":
-            path = RESULT_DATA_DIR / f"baseline_mlp_{mn}_train_predictions.csv"
+            path = RESULT_DATA_DIR / f"lstm_module_{mn}_oof_predictions.csv"
+            if not path.exists():
+                path = RESULT_DATA_DIR / f"lstm_module_{mn}_train_predictions.csv"
         else:
-            path = RESULT_DATA_DIR / f"baseline_mlp_{mn}_predictions.csv"
+            path = RESULT_DATA_DIR / f"lstm_module_{mn}_predictions.csv"
 
         if not path.exists():
             print(f"    Missing {path}")
@@ -638,9 +767,17 @@ def build_fusion_frame(split, fusion_modules):
     return merged, feature_cols
 
 
-def build_fusion_model(config, n_modules, home_prior, away_prior):
+def build_fusion_model(config, n_modules, home_prior, away_prior, init_weights=None):
     """Instantiate the fusion model according to config.fusion_style."""
     style = config.fusion_style
+    if style == "weighted_blend":
+        if init_weights is None:
+            init_weights = np.full(n_modules, 1.0 / n_modules)
+        return WeightedBlendFusionModel(
+            n_modules, init_weights, home_prior, away_prior,
+            hidden=config.blend_residual_hidden, dropout=config.fusion_dropout,
+            residual_scale=config.blend_residual_scale,
+        )
     if style == "mlp":
         return MLPFusionModel(
             n_modules, home_prior, away_prior,
@@ -684,17 +821,26 @@ def train_fusion(config, device):
         print("  Fusion skipped: missing module predictions.")
         return None
 
-    rng = np.random.default_rng(config.seed)
-    indices = rng.permutation(len(train_df))
+    # Most recent rows validate, as the test season is the future.
+    train_df = train_df.sort_values("game_id").reset_index(drop=True)
     n_val = int(len(train_df) * config.val_ratio)
-    val_idx = indices[:n_val]
-    train_idx = indices[n_val:]
-
-    fusion_train = train_df.iloc[train_idx].reset_index(drop=True)
-    fusion_val = train_df.iloc[val_idx].reset_index(drop=True)
+    fusion_train = train_df.iloc[:len(train_df) - n_val].reset_index(drop=True)
+    fusion_val = train_df.iloc[len(train_df) - n_val:].reset_index(drop=True)
 
     home_prior = float(fusion_train["HG"].mean())
     away_prior = float(fusion_train["AG"].mean())
+
+    # Per-module Poisson NLL on the most recent (validation) rows; drives the blend initialisation.
+    hg_t = torch.tensor(fusion_val["HG"].to_numpy(), dtype=torch.float32)
+    ag_t = torch.tensor(fusion_val["AG"].to_numpy(), dtype=torch.float32)
+    module_nll = {}
+    for mn in fusion_modules:
+        lh = torch.tensor(fusion_val[f"{mn}_lambda_home"].to_numpy(), dtype=torch.float32)
+        la = torch.tensor(fusion_val[f"{mn}_lambda_away"].to_numpy(), dtype=torch.float32)
+        module_nll[mn] = float(poisson_nll_loss(lh, la, hg_t, ag_t))
+    nll = np.array([module_nll[mn] for mn in fusion_modules])
+    init_weights = np.exp(-(nll - nll.min()) / config.blend_temperature)
+    init_weights = init_weights / init_weights.sum()
 
     train_ds = FusionDataset(fusion_train, feature_cols)
     val_ds = FusionDataset(fusion_val, feature_cols)
@@ -708,11 +854,13 @@ def train_fusion(config, device):
                              collate_fn=collate_simple_batch)
 
     model = build_fusion_model(config, len(fusion_modules),
-                               home_prior, away_prior).to(device)
+                               home_prior, away_prior, init_weights).to(device)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     print(f"\n  [fusion] Style: {config.fusion_style}")
     print(f"  [fusion] Modules ({len(fusion_modules)}): {fusion_modules}")
+    print(f"  [fusion] Module NLL on fusion-val rows: "
+          + ", ".join(f"{mn}={module_nll[mn]:.4f}" for mn in fusion_modules))
     if config.fusion_style.startswith("matchup_prior"):
         print(f"  [fusion] Anchor module: {fusion_modules[0]}")
         print(f"  [fusion] Residual scale: ±{config.matchup_prior_scale} "
@@ -720,7 +868,16 @@ def train_fusion(config, device):
     print(f"  [fusion] Input dim: {len(feature_cols)}, "
           f"Params: {n_params:,}")
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate,
+    # Blend weights must not be weight-decayed and learn faster.
+    blend_names = {"theta_home", "theta_away"}
+    blend_params = [p for n, p in model.named_parameters() if n in blend_names]
+    other_params = [p for n, p in model.named_parameters() if n not in blend_names]
+    param_groups = []
+    if other_params:
+        param_groups.append({"params": other_params})
+    if blend_params:
+        param_groups.append({"params": blend_params, "lr": config.blend_lr, "weight_decay": 0.0})
+    optimizer = torch.optim.AdamW(param_groups, lr=config.learning_rate,
                                   weight_decay=config.weight_decay)
 
     best_val_loss = float("inf")
@@ -737,6 +894,8 @@ def train_fusion(config, device):
             optimizer.zero_grad()
             lam_h, lam_a = model(x)
             loss = poisson_nll_loss(lam_h, lam_a, hg, ag)
+            if hasattr(model, "shrinkage"):
+                loss = loss + config.blend_shrinkage * model.shrinkage()
             loss.backward()
             optimizer.step()
 
@@ -762,6 +921,11 @@ def train_fusion(config, device):
 
     if best_state is not None:
         model.load_state_dict(best_state)
+
+    if config.fusion_style == "weighted_blend":
+        w_home = torch.softmax(model.theta_home, dim=0).detach().cpu().numpy()
+        print("  [fusion] Blend weights (home): "
+              + ", ".join(f"{mn}={w:.2f}" for mn, w in zip(fusion_modules, w_home)))
 
     test_m = compute_metrics(model, test_loader, device, config.max_goals)
     print(f"  [fusion] Test | Loss {test_m['loss']:.4f} | "
@@ -811,14 +975,14 @@ def main():
     print(f"Device: {device}")
     print(f"Config: epochs={config.epochs} lr={config.learning_rate} "
           f"wd={config.weight_decay} patience={config.patience} "
-          f"mod_dropout={config.module_dropout} hidden_cap={config.module_hidden_cap}")
+          f"mod_dropout={config.module_dropout} seq_hidden={config.seq_hidden}")
     print(f"Fusion style: {config.fusion_style}")
     print(f"Fusion modules: {list(config.fusion_modules)}")
 
     RESULT_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     print("\n" + "=" * 70)
-    print("BASELINE: INDEPENDENT MLP MODULES")
+    print("LONGITUDINAL LSTM MODULES")
     print("=" * 70)
 
     results = {}

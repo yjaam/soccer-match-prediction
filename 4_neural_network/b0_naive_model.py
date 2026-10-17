@@ -91,6 +91,7 @@ class NaiveConfig:
     threshold_max: float = 4.0       # upper bound for the tau sweep
     threshold_steps: int = 401       # resolution of the tau sweep
     seed: int = 42
+    use_pca: bool = True             # score a team by PC1 of its position-group values, not their sum
 
 
 VALUE_COLS_HOME = [
@@ -191,13 +192,39 @@ def load_historical() -> tuple[pd.DataFrame, str]:
 # PREDICTION RULE
 # ============================================================================
 
-def compute_team_scores(df: pd.DataFrame) -> tuple[pd.Series, pd.Series]:
-    home = df[VALUE_COLS_HOME].apply(pd.to_numeric, errors="coerce").sum(axis=1)
-    away = df[VALUE_COLS_AWAY].apply(pd.to_numeric, errors="coerce").sum(axis=1)
-    return home, away
+def fit_value_pca(train_df: pd.DataFrame) -> dict:
+    """PC1 of the four position-group values, shared by home and away teams.
+
+    Fit on the stacked home/away rows of the training data (no labels), standardised.
+    The sign is set so a higher score means a more valuable team.
+    """
+    home = train_df[VALUE_COLS_HOME].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+    away = train_df[VALUE_COLS_AWAY].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+    stacked = np.vstack([home, away])
+
+    mean = stacked.mean(axis=0)
+    std = stacked.std(axis=0)
+    std[std == 0] = 1.0
+    _, singular_values, vt = np.linalg.svd((stacked - mean) / std, full_matrices=False)
+    component = vt[0] if vt[0].sum() >= 0 else -vt[0]
+    explained = float(singular_values[0] ** 2 / (singular_values ** 2).sum())
+    return {"mean": mean, "std": std, "component": component, "explained": explained}
 
 
-def predict_with_threshold(df: pd.DataFrame, tau: float) -> pd.DataFrame:
+def compute_team_scores(df: pd.DataFrame, pca: dict | None = None) -> tuple[pd.Series, pd.Series]:
+    if pca is None:
+        home = df[VALUE_COLS_HOME].apply(pd.to_numeric, errors="coerce").sum(axis=1)
+        away = df[VALUE_COLS_AWAY].apply(pd.to_numeric, errors="coerce").sum(axis=1)
+        return home, away
+
+    def score(cols):
+        x = df[cols].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+        return pd.Series(((x - pca["mean"]) / pca["std"]) @ pca["component"], index=df.index)
+
+    return score(VALUE_COLS_HOME), score(VALUE_COLS_AWAY)
+
+
+def predict_with_threshold(df: pd.DataFrame, tau: float, pca: dict | None = None) -> pd.DataFrame:
     """
     Apply the decision rule with the given threshold tau.
 
@@ -206,7 +233,7 @@ def predict_with_threshold(df: pd.DataFrame, tau: float) -> pd.DataFrame:
         predicted_code    : 0 = HOME, 1 = DRAW, 2 = AWAY   (internal)
         predicted_result  : +1 = HOME, 0 = DRAW, -1 = AWAY (for CSV output)
     """
-    home_score, away_score = compute_team_scores(df)
+    home_score, away_score = compute_team_scores(df, pca)
     gap = (home_score - away_score).astype(float)
 
     labels = np.where(
@@ -366,7 +393,11 @@ def main() -> None:
           f"({100.0 * len(tune_df) / len(train_full):.1f}% of train)")
 
     # Compute the value gap on the tuning slice
-    home_tune, away_tune = compute_team_scores(tune_df)
+    pca = fit_value_pca(train_full) if config.use_pca else None
+    if pca is not None:
+        print(f"  Team value score: PC1 of the position-group values "
+              f"({100 * pca['explained']:.1f}% variance)")
+    home_tune, away_tune = compute_team_scores(tune_df, pca)
     gap_tune = (home_tune - away_tune).values.astype(float)
 
     # ------------------------------------------------------------------
@@ -399,8 +430,8 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Apply to full train and test
     # ------------------------------------------------------------------
-    train_pred = predict_with_threshold(train_full, tau)
-    test_pred = predict_with_threshold(test_df, tau)
+    train_pred = predict_with_threshold(train_full, tau, pca)
+    test_pred = predict_with_threshold(test_df, tau, pca)
 
     print(f"\n{'-' * 74}")
     print("EVALUATION")
@@ -475,6 +506,7 @@ def main() -> None:
     summary = {
         "run_date": pd.Timestamp.now().isoformat(timespec="seconds"),
         "rule": "threshold_on_market_value_gap",
+        "value_score": "pca_pc1" if pca is not None else "sum",
         "threshold": tau,
         "saved_columns": SAVED_COLUMNS,
         "result_coding": {"HOME_WIN": 1, "DRAW": 0, "AWAY_WIN": -1},

@@ -21,6 +21,7 @@ Writes only to:
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 import unicodedata
@@ -42,6 +43,10 @@ TRAINING_INPUT_PATH = PROJECT_DIR / "final_data" / "nn_input_match_stats_TRAIN.c
 UPCOMING_LINEUPS_PATH = SCRIPT_DIR / "upcoming_lineups" / "upcoming_lineups_latest.csv"
 PREDICTION_DATA_DIR = SCRIPT_DIR / "prediction_data"
 OUTPUT_PATH = PREDICTION_DATA_DIR / "upcoming_match_stats_features.csv"
+
+# Written by training script 2c when it ran with PERFORM_PCA = True.
+PCA_WEIGHTS_PATH = PROJECT_DIR / "misc" / "match_statistics_pca_weights.json"
+PC_COLUMN_PREFIX = "match_stats_pc_"
 
 PREDICTION_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -237,6 +242,20 @@ def main():
 
     print(f"  Training input defines {len(training_feature_cols)} feature columns")
 
+    # PCA mode: training reduced the match stats to principal components. Compute the
+    # raw features the PCA was fit on, then project them at the end.
+    pca_weights = None
+    model_feature_cols = training_feature_cols
+    if training_feature_cols and all(c.startswith(PC_COLUMN_PREFIX) for c in training_feature_cols):
+        if not PCA_WEIGHTS_PATH.exists():
+            print(f"Error: training used PCA but {PCA_WEIGHTS_PATH} is missing. "
+                  f"Re-run 2_match_statistics/c_create_match_statistic_pca.py.")
+            return
+        pca_weights = json.loads(PCA_WEIGHTS_PATH.read_text(encoding="utf-8"))
+        training_feature_cols = list(pca_weights["feature_columns"])
+        print(f"  PCA mode: computing {len(training_feature_cols)} raw features, "
+              f"projecting to {len(model_feature_cols)} components")
+
     home_features = [c for c in training_feature_cols if c.startswith("Home_")]
     away_features = [c for c in training_feature_cols if c.startswith("Away_")]
     other_features = [c for c in training_feature_cols
@@ -409,6 +428,18 @@ def main():
         print(f"  {r['Date']} {r['Home Team']} vs {r['Away Team']} — "
               f"{r['_nan']}/{len(feature_out_cols)} NaN")
     out = out.drop(columns=["_nan"])
+
+    if pca_weights is not None:
+        raw_cols = list(pca_weights["feature_columns"])
+        means = pd.Series(pca_weights["means"])
+        stds = pd.Series(pca_weights["stds"])
+        components = np.array(pca_weights["components"], dtype=float)
+        scaled = ((out[raw_cols].apply(pd.to_numeric, errors="coerce") - means) / stds)
+        scores = scaled.fillna(0.0).to_numpy(dtype=float) @ components.T
+        projected = out[["game_id", "Date", "Home Team", "Away Team"]].copy()
+        for i, col in enumerate(model_feature_cols):
+            projected[col] = scores[:, i]
+        out = projected
 
     # ------------------------------------------------------------------
     # Save

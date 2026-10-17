@@ -20,6 +20,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
+from pcs_init import module_pca_applied, pca_projection
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
@@ -45,6 +47,11 @@ class BaselineConfig:
     val_ratio: float = 0.1
     patience: int = 20
     max_goals: int = 12
+
+    # Modules whose upstream script did NOT apply PCA are reduced to principal
+    # components (fit on the training split) before the linear model.
+    use_pca: bool = True
+    pca_variance: float = 0.95
 
 
 # ============================================================================
@@ -317,6 +324,23 @@ def train_single_module(module_name, config, device):
 
     train_full_scaled = train_df_full.copy()
     train_full_scaled[feature_cols] = (train_full_scaled[feature_cols] - mean) / std
+
+    components = None
+    if config.use_pca and module_pca_applied(META_PATH, module_name) is False:
+        components = pca_projection(train_df[feature_cols].to_numpy(), config.pca_variance)
+    if components is not None:
+        pc_cols = [f"pc_{i + 1}" for i in range(components.shape[0])]
+
+        def _to_pcs(frame):
+            out = frame[["game_id", "HG", "AG"]].copy()
+            out[pc_cols] = frame[feature_cols].to_numpy(dtype=float) @ components.T
+            return out
+
+        train_df, val_df, test_df, train_full_scaled = (
+            _to_pcs(f) for f in (train_df, val_df, test_df, train_full_scaled)
+        )
+        print(f"  [{module_name}] PCA: {len(feature_cols)} features -> {len(pc_cols)} components")
+        feature_cols = pc_cols
 
     home_prior = float(train_df["HG"].mean())
     away_prior = float(train_df["AG"].mean())

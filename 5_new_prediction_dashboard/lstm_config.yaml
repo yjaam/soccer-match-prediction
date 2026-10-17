@@ -43,6 +43,28 @@ loss:
   spread_weight: 1.5
   target_std: 1.2
 
+# Goal-prediction boldness (read by k_train_lstm.py).
+goal_prediction:
+  goal_spread_weight: 1.0         # fusion: weight of the spread-floor penalty (0 = off)
+  goal_spread_ratio: 0.6          # predicted std >= ratio * actual std of goals; higher = bolder
+  module_goal_spread_weight: 0.5  # same penalty for the per-module MLPs (0 = off)
+  max_rate_logit: 2.0             # lambda <= prior * exp(value); caps goals (2.0 is about 10)
+
+# PCsInit: used per module only when the training scripts h / 2c skipped PCA.
+pcsinit:
+  use_pcsinit: true
+  pcsinit_variance: 0.95          # variance kept by the principal-component layer
+  pcsinit_frozen_epochs: 10       # layer frozen for these epochs, then fine-tuned
+  pcsinit_activation: false       # true = PCsInit-Act (ReLU after the PC layer)
+  pcsinit_subset_fraction: 1.0    # < 1.0 = PCsInit-Sub (PCA on a row subset)
+
+# Fusion goal rates: convex blend of module rates trained on out-of-fold predictions.
+fusion:
+  fusion_oof_folds: 5             # <= 1 falls back to in-sample module predictions
+  blend_temperature: 1.0          # large = start from the uniform average
+  blend_shrinkage: 1.0            # pull toward the uniform average
+  blend_lr: 0.005
+
 decision:
   source: classifier
   draw_margin_grid:

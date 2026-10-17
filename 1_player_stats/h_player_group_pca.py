@@ -25,6 +25,10 @@ import numpy as np
 import pandas as pd
 
 
+# True: reduce each position group to one PCA component.
+# False: skip PCA and pass the (LOCF-imputed) raw group features to the next stage.
+PERFORM_PCA = False
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
 INPUT_PATH = PROJECT_DIR / "data" / "player_group_before_pca.csv"
@@ -36,6 +40,20 @@ MISC_DIR = PROJECT_DIR / "misc"
 
 # NEW: where the fitted PCA transformation is persisted for inference reuse
 PCA_WEIGHTS_PATH = MISC_DIR / "player_statistics_pca_weights.json"
+
+# Tells folder 4 whether this module's inputs were already PCA-reduced (PCsInit is used if not).
+PCA_STATUS_PATH = MISC_DIR / "pca_status.json"
+
+
+def update_pca_status(module_name: str, pca_applied: bool) -> None:
+    status = {}
+    if PCA_STATUS_PATH.exists():
+        try:
+            status = json.loads(PCA_STATUS_PATH.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            status = {}
+    status[module_name] = {"pca_applied": bool(pca_applied)}
+    PCA_STATUS_PATH.write_text(json.dumps(status, indent=2), encoding="utf-8")
 
 
 GROUP_CONFIGS = {
@@ -351,6 +369,23 @@ def main() -> None:
     train_imputed = train_imputed.sort_values(sort_columns).reset_index(drop=True)
     test_imputed = test_imputed.sort_values(sort_columns).reset_index(drop=True)
 
+    if not PERFORM_PCA:
+        # Same output files and key/label layout as the PCA branch, raw features instead of PC1.
+        raw_columns = list(dict.fromkeys(col for cols in feature_groups.values() for col in cols))
+        raw_outputs = {}
+        for name, imputed_split in ("train", train_imputed), ("test", test_imputed):
+            out = imputed_split[["game_id"] + raw_columns].copy()
+            out["HG"] = pd.to_numeric(imputed_split["HG"], errors="coerce").values
+            out["AG"] = pd.to_numeric(imputed_split["AG"], errors="coerce").values
+            raw_outputs[name] = out.dropna(subset=["HG", "AG"])
+        raw_outputs["train"].to_csv(TRAIN_OUTPUT_PATH, index=False)
+        raw_outputs["test"].to_csv(TEST_OUTPUT_PATH, index=False)
+        update_pca_status("player_stats", False)
+        print("\nPERFORM_PCA = False: skipped PCA, saved raw features.")
+        print(f"Saved training dataset to {TRAIN_OUTPUT_PATH} {raw_outputs['train'].shape}")
+        print(f"Saved test dataset to {TEST_OUTPUT_PATH} {raw_outputs['test'].shape}")
+        return
+
     summary_rows = []
     loadings_rows = []
     top_loading_rows = []
@@ -470,7 +505,7 @@ def main() -> None:
 
     train_output.to_csv(TRAIN_OUTPUT_PATH, index=False)
     test_output.to_csv(TEST_OUTPUT_PATH, index=False)
-
+    update_pca_status("player_stats", True)
     summary_df = pd.DataFrame(summary_rows)
     loadings_df = pd.DataFrame(loadings_rows)
     top_loadings_df = pd.DataFrame(top_loading_rows)

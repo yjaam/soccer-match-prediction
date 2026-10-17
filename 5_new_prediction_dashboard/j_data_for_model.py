@@ -50,6 +50,9 @@ META_OUTPUT_PATH = NN_INPUT_DATA_DIR / "nn_module_metadata.json"
 # Dashboard-local upcoming inputs (produced by the b/c/d/e/f scripts)
 PREDICTION_DATA_DIR = SCRIPT_DIR / "prediction_data"
 
+# Written by the training scripts h (player_stats) and 2c (match_stats).
+PCA_STATUS_PATH = PROJECT_DIR / "misc" / "pca_status.json"
+
 
 # ============================================================================
 # MODULE SPECS
@@ -373,6 +376,13 @@ def main() -> None:
 
     meta = {"modules": {}}
 
+    pca_status = {}
+    if PCA_STATUS_PATH.exists():
+        try:
+            pca_status = json.loads(PCA_STATUS_PATH.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            pca_status = {}
+
     for module_name, spec in MODULE_SPECS.items():
         print(f"\n[{module_name}]")
 
@@ -420,6 +430,8 @@ def main() -> None:
         meta["modules"][module_name] = {
             "key_col": spec["key"],
             "feature_cols": feature_cols,
+            # None = unknown; k_train_lstm.py only uses PCsInit when this is False.
+            "pca_applied": pca_status.get(module_name, {}).get("pca_applied"),
             "train_file": str(train_out),
             "test_file": str(test_out),
             **stats,

@@ -56,6 +56,9 @@ POSITION_COLUMNS = {
 }
 
 # FIFA version release dates (approximate September/October of each year)
+GK_STAT_KEYS = ['overall', 'goalkeeping_diving', 'goalkeeping_handling', 'goalkeeping_kicking',
+                'goalkeeping_positioning', 'goalkeeping_reflexes', 'goalkeeping_speed']
+OUTFIELD_STAT_KEYS = ['overall', 'pace', 'shooting', 'passing', 'dribbling', 'defending', 'physic']
 FIFA_VERSION_DATES = {
     15: datetime(2014, 9, 1),
     16: datetime(2015, 9, 1),
@@ -275,10 +278,70 @@ def process_fifa_ratings():
         }
         return None, 'missing'
 
+    def build_locf_imputations():
+        """
+        Map (game_id, lineup column) -> {stat: value} for stats that are missing in the
+        match's FIFA version but were observed earlier for the same player.
+        History is scanned over ALL lineups chronologically (not only pending games), so
+        incremental runs see the same past as a full rebuild. Only earlier matches are used.
+        """
+        pending_players = set()
+        for cols in available_position_columns.values():
+            for col in cols:
+                pending_players.update(df_lineups_pending[col].dropna().astype(str).str.strip())
+        pending_players -= {'', 'nan'}
+
+        base = df_lineups[['game_id']].assign(
+            _date=pd.to_datetime(df_lineups['Date'], errors='coerce'),
+            _order=np.arange(len(df_lineups)))
+        frames = []
+        for position_group, cols in available_position_columns.items():
+            part = pd.concat([base, df_lineups[cols]], axis=1).melt(
+                id_vars=['game_id', '_date', '_order'], value_vars=cols,
+                var_name='col', value_name='player')
+            part['is_gk'] = 'Goalkeeper' in position_group
+            frames.append(part)
+        long = pd.concat(frames, ignore_index=True).dropna(subset=['player', '_date'])
+        long['player'] = long['player'].astype(str).str.strip()
+        long = long[long['player'].isin(pending_players)]
+        if long.empty:
+            return {}
+        long = long.sort_values(['_date', '_order'], kind='mergesort').reset_index(drop=True)
+
+        version_by_date = {pd.Timestamp(d): get_fifa_version_for_date(pd.Timestamp(d))
+                           for d in long['_date'].unique()}
+        versions = long['_date'].map(version_by_date).astype(int)
+
+        all_keys = list(dict.fromkeys(GK_STAT_KEYS + OUTFIELD_STAT_KEYS))
+        key_idx = {k: i for i, k in enumerate(all_keys)}
+        obs = np.full((len(long), len(all_keys)), np.nan)
+        for i, (player, ver, is_gk) in enumerate(zip(long['player'], versions, long['is_gk'])):
+            stats, _ = get_player_stats_for_version(player, int(ver))
+            if stats is None:
+                continue
+            for k in (GK_STAT_KEYS if is_gk else OUTFIELD_STAT_KEYS):
+                try:
+                    obs[i, key_idx[k]] = float(stats.get(k))
+                except (ValueError, TypeError):
+                    pass
+
+        obs_df = pd.DataFrame(obs, columns=all_keys)
+        filled = obs_df.groupby([long['player'], long['is_gk']]).ffill()
+        imputed = filled.where(obs_df.isna())  # only cells that were missing
+
+        keep = (long['game_id'].isin(set(df_lineups_pending['game_id'])).to_numpy()
+                & imputed.notna().any(axis=1).to_numpy())
+        result = {}
+        for gid, col, vals in zip(long.loc[keep, 'game_id'], long.loc[keep, 'col'],
+                                  imputed[keep].to_dict('records')):
+            result[(gid, col)] = {k: v for k, v in vals.items() if pd.notna(v)}
+        return result
+
     def get_group_stats(row, position_group, fifa_version):
         """
         Calculate average stats for a group of players for a specific position and team.
         Uses the specified FIFA version and hardcoded column groups.
+        Missing individual stats are filled from locf_imputed (last observation carried forward).
         """
         if position_group not in available_position_columns:
             return {}
@@ -286,11 +349,7 @@ def process_fifa_ratings():
         cols = available_position_columns[position_group]
         
         # Determine which stats to collect based on position
-        if 'Goalkeeper' in position_group:
-            stat_keys = ['overall', 'goalkeeping_diving', 'goalkeeping_handling', 'goalkeeping_kicking',
-                        'goalkeeping_positioning', 'goalkeeping_reflexes', 'goalkeeping_speed']
-        else:
-            stat_keys = ['overall', 'pace', 'shooting', 'passing', 'dribbling', 'defending', 'physic']
+        stat_keys = GK_STAT_KEYS if 'Goalkeeper' in position_group else OUTFIELD_STAT_KEYS
         
         collected_stats = {key: [] for key in stat_keys}
         
@@ -299,23 +358,29 @@ def process_fifa_ratings():
             
             if player_name and player_name.lower() != 'nan':
                 stats_dict, match_type = get_player_stats_for_version(player_name, fifa_version)
+                imputed = locf_imputed.get((row['game_id'], col), {})
                 
                 if stats_dict is not None:
                     match_stats[match_type] += 1
                     # Track match quality
                     if player_name not in matched_players:
                         matched_players[player_name] = match_type
-                    
-                    for key in stat_keys:
-                        val = stats_dict.get(key)
-                        if pd.notna(val):
-                            try:
-                                collected_stats[key].append(float(val))
-                            except (ValueError, TypeError):
-                                pass
                 else:
                     match_stats['missing'] += 1
                     missing_players.append(player_name)
+                
+                for key in stat_keys:
+                    val = stats_dict.get(key) if stats_dict is not None else None
+                    observed = False
+                    if pd.notna(val):
+                        try:
+                            collected_stats[key].append(float(val))
+                            observed = True
+                        except (ValueError, TypeError):
+                            pass
+                    if not observed and key in imputed:
+                        collected_stats[key].append(float(imputed[key]))
+                        locf_count['values'] += 1
         
         # Calculate averages
         result_avgs = {}
@@ -333,6 +398,13 @@ def process_fifa_ratings():
         return result_avgs
 
     # Process each match
+    print("\nBuilding LOCF imputations (last observed rating per player)...")
+    locf_count = {'values': 0}
+    lookups_before = match_stats['total_lookups']
+    locf_imputed = build_locf_imputations()
+    match_stats['total_lookups'] = lookups_before  # pre-pass lookups are not reported
+    print(f"  Player-slots with imputable stats: {len(locf_imputed):,}")
+
     print("\nProcessing matches and calculating averaged FIFA ratings...")
     fifa_results = []
     
@@ -406,6 +478,7 @@ def process_fifa_ratings():
     print(f"  Manual mapping matches:  {match_stats['manual_mapping']:,} ({match_stats['manual_mapping']/total_lookups_safe*100:.1f}%)")
     print(f"  Total matched:           {total_matched:,} ({total_matched/total_lookups_safe*100:.1f}%)")
     print(f"  Missing:                 {match_stats['missing']:,} ({match_stats['missing']/total_lookups_safe*100:.1f}%)")
+    print(f"  Stat values filled by LOCF: {locf_count['values']:,}")
     
     # Unique player statistics
     unique_players_looked_up = len(set(list(matched_players.keys()) + missing_players))

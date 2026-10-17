@@ -37,6 +37,11 @@ PREDICTION_DATA_DIR = SCRIPT_DIR / "prediction_data"
 INPUT_PATH = PREDICTION_DATA_DIR / "upcoming_lineups_values_ratings.csv"
 OUTPUT_PATH = PREDICTION_DATA_DIR / "upcoming_player_statistics_pca.csv"
 
+# Historical player-stats table that j_data_for_model.py trains on. Its columns show
+# whether the training script h applied PCA (group scores) or passed raw features.
+HISTORICAL_TRAIN_PATH = PROJECT_DIR / "final_data" / "player_statistics_pca_TRAIN.csv"
+_NON_FEATURE_COLUMNS = {"game_id", "HG", "AG"}
+
 
 def load_weights():
     if not WEIGHTS_PATH.exists():
@@ -81,6 +86,8 @@ def locf_impute_upcoming(
     imputed = imputed.sort_values([date_column, "game_id"]).reset_index(drop=True)
 
     for column in feature_columns:
+        if column not in imputed.columns:
+            imputed[column] = np.nan
         imputed[column] = pd.to_numeric(imputed[column], errors="coerce")
         fallback = fallback_means.get(column, 0.0)
         imputed[column] = imputed[column].fillna(fallback)
@@ -107,10 +114,59 @@ def project_group(frame, group_data):
     return scores
 
 
+def run_raw_mode(raw_columns):
+    """Pass the imputed raw group features through (no PCA), matching the historical table."""
+    df = pd.read_csv(INPUT_PATH, low_memory=False)
+    print(f"Loaded {len(df)} upcoming matches (raw-feature mode: training skipped PCA)")
+
+    if "game_id" not in df.columns:
+        raise KeyError("game_id column is required in upcoming data.")
+
+    date_column = resolve_date_column(df)
+    team_columns = resolve_team_columns(df)
+
+    hist = pd.read_csv(HISTORICAL_TRAIN_PATH, usecols=raw_columns, low_memory=False)
+    fallback_means = {c: float(pd.to_numeric(hist[c], errors="coerce").mean()) for c in raw_columns}
+
+    df = locf_impute_upcoming(df, raw_columns, team_columns, date_column, fallback_means)
+
+    output = pd.DataFrame({"game_id": df["game_id"].values})
+    for column in raw_columns:
+        output[column] = df[column].values
+    output["Date"] = df[date_column].values
+    output["Home Team"] = df[team_columns["home"]].values
+    output["Away Team"] = df[team_columns["away"]].values
+
+    output.to_csv(OUTPUT_PATH, index=False, encoding="utf-8-sig")
+
+    print(f"\n{'='*60}")
+    print("PLAYER STATISTICS RAW FEATURES (upcoming)")
+    print(f"{'='*60}")
+    print(f"Matches processed:     {len(output)}")
+    print(f"Raw features:          {len(raw_columns)}")
+    print(f"Saved to:              {OUTPUT_PATH}")
+
+
 def main():
     if not INPUT_PATH.exists():
         print(f"Error: input not found at {INPUT_PATH}")
         print("Run c_get_upcoming_fifa_ratings.py first.")
+        return
+
+    hist_columns = []
+    if HISTORICAL_TRAIN_PATH.exists():
+        hist_columns = pd.read_csv(HISTORICAL_TRAIN_PATH, nrows=0).columns.tolist()
+    raw_columns = [c for c in hist_columns if c not in _NON_FEATURE_COLUMNS]
+
+    weights = None
+    if WEIGHTS_PATH.exists():
+        weights = load_weights()
+    # Raw mode: the training script h skipped PCA, so the historical table holds raw features.
+    raw_mode = bool(raw_columns) and (
+        weights is None or not set(weights["groups"]) <= set(hist_columns)
+    )
+    if raw_mode:
+        run_raw_mode(raw_columns)
         return
 
     weights = load_weights()

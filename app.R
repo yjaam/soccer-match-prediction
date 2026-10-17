@@ -26,6 +26,7 @@ library(lubridate)
 library(shinyjs)
 library(jsonlite)
 library(htmltools)
+library(processx)
 
 
 # ============================================================================
@@ -64,6 +65,32 @@ message("PROJECT_ROOT:   ", PROJECT_ROOT)
 message("WEEKLY_RESULTS: ", WEEKLY_RESULTS_DIR)
 message("LATEST_PRED:    ", LATEST_PRED_PATH)
 message("LOGOS_DIR:      ", LOGOS_DIR)
+
+
+# ============================================================================
+# BACKGROUND PIPELINE (Refresh button)
+# ============================================================================
+
+find_python <- function() {
+  venv_py <- file.path(PROJECT_ROOT, ".venv", "bin", "python")
+  if (file.exists(venv_py)) return(venv_py)
+  env_py <- Sys.getenv("PYTHON", unset = "")
+  if (nzchar(env_py)) return(env_py)
+  Sys.which("python3")[[1]]
+}
+
+list_pipeline_scripts <- function() {
+  sort(list.files(PIPELINE_DIR, pattern = "\\.py$", full.names = TRUE))
+}
+
+start_pipeline_step <- function(script, log_path) {
+  processx::process$new(
+    find_python(), c("-u", script),
+    wd = PROJECT_ROOT,
+    env = c("current", PYTHONPATH = PROJECT_ROOT, PYTHONUNBUFFERED = "1"),
+    stdout = log_path, stderr = "2>&1"
+  )
+}
 
 
 # ============================================================================
@@ -628,6 +655,7 @@ ui <- fluidPage(
   ),
 
   uiOutput("error_banner"),
+  uiOutput("pipeline_status"),
 
   tabsetPanel(
     id = "main_tabs",
@@ -826,21 +854,94 @@ server <- function(input, output, session) {
   output$refresh_button_ui <- renderUI({
     if (isTRUE(refreshing())) {
       actionButton("refresh_btn", tagList(
-        tags$span(class = "btn-spinner"), "Refreshing..."
+        tags$span(class = "btn-spinner"), "Recomputing..."
       ), class = "refresh-btn loading", disabled = TRUE)
     } else {
       actionButton("refresh_btn", "🔄 Refresh", class = "refresh-btn")
     }
   })
 
+  # Pipeline state: scripts run one after another in a background process,
+  # polled from the reactive loop so the UI stays responsive.
+  pipe <- reactiveValues(scripts = character(0), idx = 0, step_start = NULL,
+                         error = NULL, finished_msg = NULL)
+  pipe_proc <- NULL
+  pipe_log <- tempfile(fileext = ".log")
+
+  finish_pipeline <- function(error = NULL, msg = NULL) {
+    pipe_proc <<- NULL
+    pipe$idx <- 0
+    pipe$error <- error
+    pipe$finished_msg <- msg
+    refreshing(FALSE)
+    reload_trigger(reload_trigger() + 1)
+  }
+
   observeEvent(input$refresh_btn, {
     req(input$refresh_btn > 0)
+    if (isTRUE(refreshing())) return()
+    scripts <- list_pipeline_scripts()
+    if (length(scripts) == 0) {
+      pipe$error <- "No Python scripts found in 5_new_prediction_dashboard."
+      return()
+    }
+    pipe$error <- NULL
+    pipe$finished_msg <- NULL
+    pipe$scripts <- scripts
+    cat("", file = pipe_log)
     refreshing(TRUE)
-    Sys.sleep(0.6)
-    reload_trigger(reload_trigger() + 1)
-    session$onFlushed(function() {
-      Sys.sleep(0.4); refreshing(FALSE)
-    }, once = TRUE)
+    pipe$idx <- 1
+    pipe$step_start <- Sys.time()
+    pipe_proc <<- tryCatch(start_pipeline_step(scripts[1], pipe_log),
+                           error = function(e) { finish_pipeline(conditionMessage(e)); NULL })
+  })
+
+  observe({
+    req(isTRUE(refreshing()), pipe$idx > 0)
+    invalidateLater(500, session)
+    proc <- pipe_proc
+    if (is.null(proc) || proc$is_alive()) return()
+    i <- isolate(pipe$idx)
+    name <- basename(isolate(pipe$scripts)[i])
+    status <- proc$get_exit_status()
+    if (!identical(status, 0L)) {
+      log_lines <- tryCatch(readLines(pipe_log, warn = FALSE), error = function(e) character(0))
+      tail_txt <- paste(utils::tail(log_lines, 15), collapse = "\n")
+      finish_pipeline(error = sprintf("%s failed (exit %s).\n%s", name, status, tail_txt))
+      return()
+    }
+    if (i >= length(isolate(pipe$scripts))) {
+      finish_pipeline(msg = sprintf("Pipeline finished: %d scripts ran successfully.", i))
+      return()
+    }
+    pipe$idx <- i + 1
+    pipe$step_start <- Sys.time()
+    pipe_proc <<- tryCatch(
+      start_pipeline_step(isolate(pipe$scripts)[i + 1], pipe_log),
+      error = function(e) { finish_pipeline(conditionMessage(e)); NULL })
+  })
+
+  session$onSessionEnded(function() {
+    if (!is.null(pipe_proc) && pipe_proc$is_alive()) pipe_proc$kill()
+  })
+
+  output$pipeline_status <- renderUI({
+    if (isTRUE(refreshing()) && pipe$idx > 0) {
+      return(div(class = "empty-banner", style = "background:#e8eaf6;border-left-color:#1a237e;",
+                 sprintf("Recomputing model: step %d of %d (%s)…",
+                         pipe$idx, length(pipe$scripts),
+                         basename(pipe$scripts[pipe$idx]))))
+    }
+    if (!is.null(pipe$error)) {
+      return(div(class = "empty-banner",
+                 tags$strong("Refresh failed. Showing previously prepared data."),
+                 tags$pre(style = "white-space:pre-wrap;margin:8px 0 0;", pipe$error)))
+    }
+    if (!is.null(pipe$finished_msg)) {
+      return(div(class = "empty-banner", style = "background:#e8f5e9;border-left-color:#2e7d32;",
+                 pipe$finished_msg))
+    }
+    NULL
   })
 
   # ------------------------------------------------------------------

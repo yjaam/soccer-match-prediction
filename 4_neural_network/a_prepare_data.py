@@ -261,6 +261,9 @@ def main() -> None:
 
     meta = {"modules": {}}
 
+    pca_status_path = MISC_DIR / "pca_status.json"
+    pca_status = json.loads(pca_status_path.read_text(encoding="utf-8")) if pca_status_path.exists() else {}
+
     for module_name, spec in MODULE_SPECS.items():
         key_col = spec["key"]
 
@@ -290,6 +293,8 @@ def main() -> None:
         meta["modules"][module_name] = {
             "key_col": key_col,
             "feature_cols": feature_cols,
+            # None = unknown; the b-scripts only use PCsInit when this is False.
+            "pca_applied": pca_status.get(module_name, {}).get("pca_applied"),
             "train_file": str(train_out),
             "test_file": str(test_out),
             **stats,
