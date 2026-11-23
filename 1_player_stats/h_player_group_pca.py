@@ -28,6 +28,7 @@ import pandas as pd
 # True: reduce each position group to one PCA component.
 # False: skip PCA and pass the (LOCF-imputed) raw group features to the next stage.
 PERFORM_PCA = False
+PCA_VARIANCE_THRESHOLD = 0.95
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent

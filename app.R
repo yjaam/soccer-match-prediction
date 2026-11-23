@@ -83,12 +83,20 @@ list_pipeline_scripts <- function() {
   sort(list.files(PIPELINE_DIR, pattern = "\\.py$", full.names = TRUE))
 }
 
+# Understat can leave its HTTP requests waiting indefinitely. Limit only the xG
+# step; training and other longer-running steps are not subject to this limit.
+pipeline_step_timeout <- function(script) {
+  if (basename(script) != "d_get_upcoming_xg_values.py") return(Inf)
+  seconds <- suppressWarnings(as.numeric(Sys.getenv("PIPELINE_XG_TIMEOUT_SECONDS", "10")))
+  if (length(seconds) != 1 || !is.finite(seconds) || seconds <= 0) 300 else seconds
+}
+
 start_pipeline_step <- function(script, log_path) {
   processx::process$new(
     find_python(), c("-u", script),
     wd = PROJECT_ROOT,
     env = c("current", PYTHONPATH = PROJECT_ROOT, PYTHONUNBUFFERED = "1"),
-    stdout = log_path, stderr = "2>&1"
+    stdout = log_path, stderr = "2>&1", cleanup_tree = TRUE
   )
 }
 
@@ -864,9 +872,10 @@ server <- function(input, output, session) {
   # Pipeline state: scripts run one after another in a background process,
   # polled from the reactive loop so the UI stays responsive.
   pipe <- reactiveValues(scripts = character(0), idx = 0, step_start = NULL,
-                         error = NULL, finished_msg = NULL)
+                         failures = character(0), error = NULL, finished_msg = NULL)
   pipe_proc <- NULL
-  pipe_log <- tempfile(fileext = ".log")
+  pipe_log <- NULL
+  timed_out_procs <- list()
 
   finish_pipeline <- function(error = NULL, msg = NULL) {
     pipe_proc <<- NULL
@@ -875,6 +884,59 @@ server <- function(input, output, session) {
     pipe$finished_msg <- msg
     refreshing(FALSE)
     reload_trigger(reload_trigger() + 1)
+  }
+
+  # A launch error is also a step failure, not a reason to skip later scripts.
+  launch_pipeline_step <- function(i) {
+    while (i <= length(isolate(pipe$scripts))) {
+      pipe$idx <- i
+      pipe$step_start <- Sys.time()
+      script <- isolate(pipe$scripts)[i]
+      # A timed-out process may still write to its log after the next starts.
+      pipe_log <<- tempfile(fileext = ".log")
+      result <- tryCatch(
+        list(process = start_pipeline_step(script, pipe_log), error = NULL),
+        error = function(e) list(process = NULL, error = conditionMessage(e))
+      )
+      if (is.null(result$error)) {
+        pipe_proc <<- result$process
+        return(invisible(NULL))
+      }
+      pipe$failures <- c(isolate(pipe$failures),
+                         sprintf("%s could not start: %s", basename(script), result$error))
+      i <- i + 1
+    }
+    failures <- isolate(pipe$failures)
+    if (length(failures) > 0) {
+      finish_pipeline(error = paste(failures, collapse = "\n\n"),
+                      msg = sprintf("Pipeline finished with %d failed step(s) out of %d.",
+                                    length(failures), length(isolate(pipe$scripts))))
+    } else {
+      finish_pipeline(msg = sprintf("Pipeline finished: %d scripts ran successfully.",
+                                    length(isolate(pipe$scripts))))
+    }
+  }
+
+  pipeline_log_tail <- function() {
+    if (is.null(pipe_log) || !file.exists(pipe_log)) return("")
+    lines <- tryCatch(readLines(pipe_log, warn = FALSE), error = function(e) character(0))
+    paste(utils::tail(lines, 15), collapse = "\n")
+  }
+
+  abandon_pipeline_step <- function(proc, i, name, reason) {
+    # A kill can fail or take time to be reported; never let that block later steps.
+    try(proc$kill_tree(), silent = TRUE)
+    try(proc$kill(), silent = TRUE)
+    try(proc$wait(timeout = 100), silent = TRUE)
+    alive <- tryCatch(proc$is_alive(), error = function(e) NA)
+    stopped <- identical(alive, FALSE)
+    if (!stopped) timed_out_procs[[length(timed_out_procs) + 1]] <<- proc
+    termination <- if (stopped) "was stopped" else
+      "could not be confirmed stopped and may still write to output files"
+    pipe$failures <- c(isolate(pipe$failures),
+                       sprintf("%s %s; %s.\n%s", name, reason, termination,
+                               pipeline_log_tail()))
+    launch_pipeline_step(i + 1)
   }
 
   observeEvent(input$refresh_btn, {
@@ -887,42 +949,50 @@ server <- function(input, output, session) {
     }
     pipe$error <- NULL
     pipe$finished_msg <- NULL
+    pipe$failures <- character(0)
     pipe$scripts <- scripts
-    cat("", file = pipe_log)
     refreshing(TRUE)
-    pipe$idx <- 1
-    pipe$step_start <- Sys.time()
-    pipe_proc <<- tryCatch(start_pipeline_step(scripts[1], pipe_log),
-                           error = function(e) { finish_pipeline(conditionMessage(e)); NULL })
+    launch_pipeline_step(1)
   })
 
   observe({
     req(isTRUE(refreshing()), pipe$idx > 0)
     invalidateLater(500, session)
     proc <- pipe_proc
-    if (is.null(proc) || proc$is_alive()) return()
+    if (is.null(proc)) return()
     i <- isolate(pipe$idx)
     name <- basename(isolate(pipe$scripts)[i])
-    status <- proc$get_exit_status()
+    alive <- tryCatch(proc$is_alive(), error = function(e) e)
+    if (inherits(alive, "error")) {
+      abandon_pipeline_step(proc, i, name, paste("could not be monitored:", conditionMessage(alive)))
+      return()
+    }
+    if (isTRUE(alive)) {
+      timeout <- pipeline_step_timeout(name)
+      elapsed <- as.numeric(difftime(Sys.time(), isolate(pipe$step_start), units = "secs"))
+      if (elapsed < timeout) return()
+
+      abandon_pipeline_step(proc, i, name, sprintf("timed out after %.0f seconds", timeout))
+      return()
+    }
+    status <- tryCatch(proc$get_exit_status(), error = function(e) e)
+    if (inherits(status, "error")) {
+      abandon_pipeline_step(proc, i, name, paste("exit status unavailable:", conditionMessage(status)))
+      return()
+    }
     if (!identical(status, 0L)) {
-      log_lines <- tryCatch(readLines(pipe_log, warn = FALSE), error = function(e) character(0))
-      tail_txt <- paste(utils::tail(log_lines, 15), collapse = "\n")
-      finish_pipeline(error = sprintf("%s failed (exit %s).\n%s", name, status, tail_txt))
-      return()
+      pipe$failures <- c(isolate(pipe$failures),
+                         sprintf("%s failed (exit %s).\n%s", name, status, pipeline_log_tail()))
     }
-    if (i >= length(isolate(pipe$scripts))) {
-      finish_pipeline(msg = sprintf("Pipeline finished: %d scripts ran successfully.", i))
-      return()
-    }
-    pipe$idx <- i + 1
-    pipe$step_start <- Sys.time()
-    pipe_proc <<- tryCatch(
-      start_pipeline_step(isolate(pipe$scripts)[i + 1], pipe_log),
-      error = function(e) { finish_pipeline(conditionMessage(e)); NULL })
+    launch_pipeline_step(i + 1)
   })
 
   session$onSessionEnded(function() {
-    if (!is.null(pipe_proc) && pipe_proc$is_alive()) pipe_proc$kill()
+    processes <- c(timed_out_procs, if (!is.null(pipe_proc)) list(pipe_proc))
+    for (proc in processes) {
+      try(proc$kill_tree(), silent = TRUE)
+      try(proc$kill(), silent = TRUE)
+    }
   })
 
   output$pipeline_status <- renderUI({
@@ -934,7 +1004,9 @@ server <- function(input, output, session) {
     }
     if (!is.null(pipe$error)) {
       return(div(class = "empty-banner",
-                 tags$strong("Refresh failed. Showing previously prepared data."),
+                 tags$strong(if (!is.null(pipe$finished_msg)) pipe$finished_msg else "Refresh failed."),
+                 if (!is.null(pipe$finished_msg))
+                   tags$p("Some data may be stale or incomplete; later steps were still attempted."),
                  tags$pre(style = "white-space:pre-wrap;margin:8px 0 0;", pipe$error)))
     }
     if (!is.null(pipe$finished_msg)) {

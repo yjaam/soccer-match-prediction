@@ -42,7 +42,7 @@ game_id,league,home_team,away_team,predicted_home_goals,predicted_away_goals,pre
 20261011_SAS_ACM,Serie A,Sassuolo,AC Milan,1.31,1.15,0.17,0.302,0.379,0.319,DRAW,0.379,1,1,DRAW
 20261011_SCF_S04,Bundesliga,SC Freiburg,FC Schalke 04,1.6,0.97,0.64,0.402,0.363,0.235,HOME_WIN,0.402,2,1,HOME_WIN
 20261011_TRO_OM,Ligue 1,Troyes,Marseille,1.0,1.61,-0.61,0.16,0.323,0.517,AWAY_WIN,0.517,0,2,AWAY_WIN
-20261012_ATA_VEN,Serie A,Atalanta,Venezia,1.96,0.84,1.12,0.521,0.314,0.165,HOME_WIN,0.521,,,
-20261012_COV_NEW,Premier League,Coventry City,Newcastle United,1.45,1.06,0.39,0.353,0.374,0.273,DRAW,0.374,,,
-20261012_LEV_SEV,La Liga,Levante,Sevilla,1.29,1.18,0.11,0.288,0.378,0.333,DRAW,0.378,,,
-20261012_TOR_UDI,Serie A,Torino,Udinese,1.62,0.96,0.66,0.409,0.361,0.23,HOME_WIN,0.409,,,
+20261012_ATA_VEN,Serie A,Atalanta,Venezia,1.96,0.84,1.12,0.521,0.314,0.165,HOME_WIN,0.521,3,1,HOME_WIN
+20261012_COV_NEW,Premier League,Coventry City,Newcastle United,1.45,1.06,0.39,0.353,0.374,0.273,DRAW,0.374,4,1,HOME_WIN
+20261012_LEV_SEV,La Liga,Levante,Sevilla,1.29,1.18,0.11,0.288,0.378,0.333,DRAW,0.378,3,3,DRAW
+20261012_TOR_UDI,Serie A,Torino,Udinese,1.62,0.96,0.66,0.409,0.361,0.23,HOME_WIN,0.409,2,1,HOME_WIN

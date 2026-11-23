@@ -9,7 +9,9 @@ Pipeline
    where every game carries its current features plus 5 history sequences
    (home/away form, home/away season, head-to-head) built from earlier games.
 1. Train one LSTM per module. Each runs over the history sequences, combines them
-   with the current-game features and predicts (lambda_home, lambda_away).
+    with the current-game features and predicts (lambda_home, lambda_away). A
+    shared PCsInit layer projects current and historical module features; history
+    context (including the padding mask) bypasses this layer.
 2. Combine the module predictions with a fusion model. Styles:
 
    "mlp"                 - MLP over the concatenated module predictions.
@@ -45,6 +47,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
+from pcs_init import pca_projection
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
@@ -57,8 +61,8 @@ BASELINE_SUMMARY_PATH = RESULT_DATA_DIR / "lstm_fusion_summary.json"
 BASELINE_MODEL_PATH = RESULT_DATA_DIR / "lstm_fusion_model.pt"
 BASELINE_PRED_PATH = RESULT_DATA_DIR / "lstm_fusion_predictions.csv"
 
-MODULES = ["lineup", "player_stats", "skill_matchups", "match_stats",
-           "matchup", "league", "season"]
+MODULES = ["lineup", "player_stats", "skill_matchups", "match_stats"]
+          # "matchup", "league", "season"]
 
 
 @dataclass
@@ -79,11 +83,21 @@ class BaselineConfig:
     cur_hidden: int = 24           # encoder width for the current-game features
     module_dropout: float = 0.3
 
+    # PCsInit is applied to every module by default. Fit principal directions
+    # on the current features of the fit split only, separately for each fold.
+    use_pcsinit: bool = True
+    pcsinit_variance: float = 0.95
+    pcsinit_frozen_epochs: int = 10
+    pcsinit_activation: bool = False
+    pcsinit_subset_fraction: float = 1.0
+
     # --- Fusion: which modules and which style --------------------------
     # For "matchup_prior_*" styles, the first entry is the anchor.
     fusion_modules: tuple = (
-        "matchup", "lineup", "player_stats", "skill_matchups", "match_stats", "season"
+         "lineup", "player_stats", "skill_matchups", "match_stats", "matchup", "season"
     )
+
+    #"matchup", "season"
     fusion_style: str = "weighted_blend"
     # "weighted_blend" | "mlp" | "lstm" | "matchup_prior_mlp" | "matchup_prior_lstm"
 
@@ -196,37 +210,69 @@ class SequenceRateModel(nn.Module):
     """
     def __init__(self, n_current, n_series, seq_len, step_dim,
                  home_prior=1.35, away_prior=1.10,
-                 proj=24, hidden=24, num_layers=1, cur_hidden=24, dropout=0.3):
+                 proj=24, hidden=24, num_layers=1, cur_hidden=24, dropout=0.3,
+                 pca_weights=None, pca_activation=False):
         super().__init__()
         self.n_current, self.n_series = n_current, n_series
         self.seq_len, self.step_dim = seq_len, step_dim
+        if step_dim <= n_current:
+            raise ValueError("History steps must contain current features and a valid mask.")
         self.register_buffer(
             "log_home_prior", torch.tensor(float(np.log(home_prior)))
         )
         self.register_buffer(
             "log_away_prior", torch.tensor(float(np.log(away_prior)))
         )
-        self.step_enc = nn.Sequential(nn.Linear(step_dim, proj), nn.ReLU(), nn.Dropout(dropout))
+        # The same module features occur in the current row and every history
+        # step. Share their projection, but do not project the context/mask.
+        self.pca_layer = None
+        projected_dim = n_current
+        if pca_weights is not None:
+            if pca_weights.ndim != 2 or pca_weights.shape[1] != n_current:
+                raise ValueError("PCA weights must have shape (n_components, n_current).")
+            projected_dim = pca_weights.shape[0]
+            self.pca_layer = nn.Linear(n_current, projected_dim)
+            with torch.no_grad():
+                self.pca_layer.weight.copy_(torch.as_tensor(pca_weights, dtype=torch.float32))
+                self.pca_layer.bias.zero_()
+        self.pca_act = nn.ReLU() if pca_activation else nn.Identity()
+        self.step_enc = nn.Sequential(
+            nn.Linear(projected_dim + step_dim - n_current, proj),
+            nn.ReLU(), nn.Dropout(dropout),
+        )
         self.lstms = nn.ModuleList([
             nn.LSTM(proj, hidden, num_layers=num_layers, batch_first=True,
                     dropout=dropout if num_layers > 1 else 0.0)
             for _ in range(n_series)
         ])
         self.cur_enc = nn.Sequential(
-            nn.Linear(n_current, cur_hidden), nn.ReLU(), nn.Dropout(dropout),
+            nn.Linear(projected_dim, cur_hidden), nn.ReLU(), nn.Dropout(dropout),
         )
         self.head = nn.Linear(cur_hidden + n_series * hidden, 2)
         nn.init.normal_(self.head.weight, mean=0.0, std=1e-2)
         nn.init.zeros_(self.head.bias)
+
+    def set_pca_frozen(self, frozen):
+        if self.pca_layer is not None:
+            for parameter in self.pca_layer.parameters():
+                parameter.requires_grad_(not frozen)
+
+    def project_features(self, features):
+        if self.pca_layer is None:
+            return features
+        return self.pca_act(self.pca_layer(features))
 
     def forward(self, x):
         B = x.shape[0]
         cur = x[:, :self.n_current]
         seq = x[:, self.n_current:].reshape(B, self.n_series, self.seq_len, self.step_dim)
         valid = seq[..., -1:]
-        feats = [self.cur_enc(cur)]
+        feats = [self.cur_enc(self.project_features(cur))]
         for s, lstm in enumerate(self.lstms):
-            steps = self.step_enc(seq[:, s]) * valid[:, s]
+            history = seq[:, s]
+            history = torch.cat((self.project_features(history[..., :self.n_current]),
+                                 history[..., self.n_current:]), dim=-1)
+            steps = self.step_enc(history) * valid[:, s]
             _, (h_n, _) = lstm(steps)
             feats.append(h_n[-1])
         logits = self.head(torch.cat(feats, dim=1))
@@ -587,18 +633,29 @@ def fit_module_lstm(module_name, fit_df, val_df, feature_cols, config, device, v
     val_loader = DataLoader(val_ds, batch_size=config.batch_size, shuffle=False,
                             collate_fn=collate_simple_batch)
 
+    pca_weights = None
+    if config.use_pcsinit:
+        current_cols = feature_cols[:meta["n_current"]]
+        pca_weights = pca_projection(
+            fit_df[current_cols].to_numpy(), config.pcsinit_variance,
+            config.pcsinit_subset_fraction, config.seed,
+        )
+
     model = SequenceRateModel(
         meta["n_current"], meta["n_series"], meta["seq_len"], meta["step_dim"],
         home_prior, away_prior,
         proj=config.seq_proj, hidden=config.seq_hidden, num_layers=config.seq_layers,
         cur_hidden=config.cur_hidden, dropout=config.module_dropout,
+        pca_weights=pca_weights, pca_activation=config.pcsinit_activation,
     ).to(device)
 
     if verbose:
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        pcs_note = (f", PCsInit: {pca_weights.shape[0]} PCs" if pca_weights is not None
+                  else ", PCsInit: unavailable" if config.use_pcsinit else "")
         print(f"\n  [{module_name}] Training (Current feats: {meta['n_current']}, "
               f"Series: {meta['n_series']}x{meta['seq_len']}x{meta['step_dim']}, "
-              f"Rows: {len(train_ds)}, Params: {n_params:,})")
+              f"Rows: {len(train_ds)}, Params: {n_params:,}{pcs_note})")
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate,
                                   weight_decay=config.weight_decay)
@@ -608,7 +665,13 @@ def fit_module_lstm(module_name, fit_df, val_df, feature_cols, config, device, v
     best_epoch = 0
     patience_counter = 0
 
+    pcs_frozen = pca_weights is not None and config.pcsinit_frozen_epochs > 0
+    model.set_pca_frozen(pcs_frozen)
     for epoch in range(1, config.epochs + 1):
+        if pcs_frozen and epoch > config.pcsinit_frozen_epochs:
+            model.set_pca_frozen(False)
+            pcs_frozen = False
+            patience_counter = 0
         model.train()
         for batch in train_loader:
             x = batch["x"].to(device)
@@ -631,7 +694,7 @@ def fit_module_lstm(module_name, fit_df, val_df, feature_cols, config, device, v
         else:
             patience_counter += 1
 
-        if patience_counter >= config.patience:
+        if not pcs_frozen and patience_counter >= config.patience:
             if verbose:
                 print(f"    Early stopping at epoch {epoch}")
             break
@@ -701,6 +764,16 @@ def train_single_module(module_name, config, device):
         "state_dict": model.state_dict(),
         "module_name": module_name,
         "best_epoch": best_epoch,
+        "model_config": {
+            "seq_proj": config.seq_proj,
+            "seq_hidden": config.seq_hidden,
+            "seq_layers": config.seq_layers,
+            "cur_hidden": config.cur_hidden,
+            "module_dropout": config.module_dropout,
+            "pcsinit_activation": config.pcsinit_activation,
+            "pcsinit_components": (model.pca_layer.out_features
+                                   if model.pca_layer is not None else None),
+        },
     }, model_path)
 
     train_pred = predict_frame(model, train_df_full, feature_cols, config, device)

@@ -281,9 +281,9 @@
       "pca_applied": false,
       "train_file": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/final_data/nn_input_match_stats_TRAIN.csv",
       "test_file": "/Users/yasharjam/Documents/Uni_Master/soccer-match-prediction/final_data/nn_input_match_stats_TEST.csv",
-      "rows_train_before": 20152,
+      "rows_train_before": 20327,
       "rows_test_before": 1756,
-      "rows_train_after": 20136,
+      "rows_train_after": 20311,
       "rows_test_after": 1756,
       "feature_count": 28,
       "standardized": true
